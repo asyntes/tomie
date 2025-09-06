@@ -55,7 +55,7 @@
     "retention": "Your messages are processed in real-time and are not retained after the session ends.",
     "questions": "For questions about data handling, please refer to:",
     "links": [
-      "xAI Privacy Policy: https://x.ai/privacy",
+      "xAI Privacy Policy: https://x.ai/legal/privacy-policy",
       "Vercel Privacy Policy: https://vercel.com/legal/privacy-policy"
     ],
     "lastUpdated": "Last updated:",
