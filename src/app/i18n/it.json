@@ -33,6 +33,7 @@
     "bulletPoints": [
       "I tuoi messaggi vengono inviati a xAI (Grok API) per la generazione di risposte AI",
       "I messaggi vengono anche elaborati sull'infrastruttura Vercel per l'hosting dell'applicazione",
+      "xAI e Vercel potrebbero tracciare il tuo indirizzo IP a scopo statistico, ma questi dati non vengono collegati alle tue conversazioni",
       "Nessun dato di conversazione viene memorizzato o registrato permanentemente da questa applicazione",
       "La trasmissione dei dati avviene solo per la generazione di risposte in tempo reale",
       "Non vengono raccolte informazioni personali oltre ai messaggi che scegli di inviare"
