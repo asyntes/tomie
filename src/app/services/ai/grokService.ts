@@ -24,7 +24,7 @@ export class GrokService {
     return new GrokService({
       apiKey,
       baseURL: 'https://api.x.ai/v1',
-      model: 'grok-3-mini',
+      model: 'grok-4-fast-non-reasoning',
       temperature: 0,
       top_p: 0.95,
       max_tokens: 2048,
