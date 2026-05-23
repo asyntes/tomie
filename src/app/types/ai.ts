@@ -13,7 +13,13 @@ export interface ConversationMessage {
 export interface AIRequest {
   prompt: string;
   currentMood: Mood;
+  responseMood?: Mood;
   upcomingMood?: Mood;
+  isApproaching?: boolean;
+  pendingMood?: Mood;
+  approachProgress?: number;
+  approachThreshold?: number;
+  approachLabel?: string;
   messages?: ConversationMessage[];
 }
 

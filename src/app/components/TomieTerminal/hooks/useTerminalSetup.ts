@@ -10,7 +10,7 @@ export const useTerminalSetup = (
     const [isSafari, setIsSafari] = useState(false);
     const [isTouchDevice, setIsTouchDevice] = useState(false);
     const [messages, setMessages] = useState<Message[]>([]);
-    const { t } = useI18n();
+    const { t, isLocaleReady } = useI18n();
 
     const initialMessages = useMemo(() => [
         {
@@ -51,10 +51,12 @@ export const useTerminalSetup = (
     ], [t]);
 
     useEffect(() => {
-        if (!isInitialized) {
-            setMessages(initialMessages);
-            setIsInitialized(true);
+        if (!isLocaleReady || isInitialized) {
+            return;
         }
+
+        setMessages(initialMessages);
+        setIsInitialized(true);
 
         const userAgent = navigator.userAgent;
         const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(userAgent);
@@ -89,7 +91,7 @@ export const useTerminalSetup = (
             window.removeEventListener('orientationchange', handleOrientationChange);
             window.removeEventListener('resize', handleOrientationChange);
         };
-    }, [isInitialized, inputRef, initialMessages]);
+    }, [isLocaleReady, isInitialized, inputRef, initialMessages]);
 
     return {
         isInitialized,

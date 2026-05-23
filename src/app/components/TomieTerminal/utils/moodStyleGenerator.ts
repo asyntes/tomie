@@ -125,44 +125,32 @@ export const generateMoodStyles = (currentMood: Mood): string => {
         }
         
         @keyframes interference {
-            0%, 100% { opacity: 0; }
-            5% { opacity: 0.8; }
-            10% { opacity: 0.2; }
-            15% { opacity: 0.9; }
-            20% { opacity: 0.1; }
-            25% { opacity: 0.7; }
-            30% { opacity: 0.3; }
-            35% { opacity: 0.6; }
-            40% { opacity: 0.4; }
-            45% { opacity: 0.8; }
-            50% { opacity: 0.2; }
-            55% { opacity: 0.9; }
-            60% { opacity: 0.1; }
-            65% { opacity: 0.6; }
-            70% { opacity: 0.4; }
-            75% { opacity: 0.7; }
-            80% { opacity: 0.3; }
-            85% { opacity: 0.8; }
-            90% { opacity: 0.2; }
-            95% { opacity: 0.5; }
+            0% { opacity: 0; }
+            8% { opacity: 0.85; }
+            16% { opacity: 0.15; }
+            24% { opacity: 0.9; }
+            32% { opacity: 0.2; }
+            40% { opacity: 0.75; }
+            48% { opacity: 0.1; }
+            56% { opacity: 0.6; }
+            64% { opacity: 0.25; }
+            72% { opacity: 0.5; }
+            80% { opacity: 0.15; }
+            100% { opacity: 0; }
         }
         
         @keyframes scanlines {
-            0% { transform: translateY(-100vh); }
-            100% { transform: translateY(100vh); }
+            0% { transform: translateY(-20vh); opacity: 0.9; }
+            100% { transform: translateY(120vh); opacity: 0; }
         }
         
         @keyframes noise {
             0% { transform: translateX(0); }
-            10% { transform: translateX(-0.125rem); }
-            20% { transform: translateX(0.125rem); }
-            30% { transform: translateX(-0.0625rem); }
-            40% { transform: translateX(0.0625rem); }
-            50% { transform: translateX(-0.03125rem); }
-            60% { transform: translateX(0.03125rem); }
-            70% { transform: translateX(-0.0625rem); }
-            80% { transform: translateX(0.0625rem); }
-            90% { transform: translateX(-0.5px); }
+            15% { transform: translateX(-0.125rem); }
+            30% { transform: translateX(0.125rem); }
+            45% { transform: translateX(-0.0625rem); }
+            60% { transform: translateX(0.0625rem); }
+            75% { transform: translateX(-0.03125rem); }
             100% { transform: translateX(0); }
         }
         
@@ -188,7 +176,7 @@ export const generateMoodStyles = (currentMood: Mood): string => {
                     rgba(${moodRGB}, 0.05) 0.125rem,
                     transparent 0.1875rem
                 );
-            animation: interference 0.6s ease-in-out, noise 0.1s infinite;
+            animation: interference 0.55s ease-out forwards, noise 0.55s ease-out forwards;
         }
         
         .interference-overlay::before {
@@ -203,7 +191,7 @@ export const generateMoodStyles = (currentMood: Mood): string => {
                 ${currentColors.primary}, 
                 transparent
             );
-            animation: scanlines 0.6s linear infinite;
+            animation: scanlines 0.55s linear forwards;
         }
         
         .interference-overlay::after {
