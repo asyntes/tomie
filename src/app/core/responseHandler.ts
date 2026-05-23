@@ -1,109 +1,136 @@
 import { Mood } from '../types/mood';
 import { MoodState } from '../types/mood';
 import { systemMessages } from './systemMessages';
+import { commitTurn, getApproachLabel, getApproachThresholdForState } from './moodStateMachine';
+import { normalizeMoodState } from './normalizeMoodState';
 
 export const generatePredefinedResponse = (mood: Mood): string => {
     const moodResponses = systemMessages[mood];
     return moodResponses[Math.floor(Math.random() * moodResponses.length)];
 };
 
-export const calculateMoodTransition = (
-    moodState: MoodState,
-    detectedMood: Mood
-): { willChangeMood: boolean; newMood: Mood } => {
-    let willChangeMood = false;
-    let newMood = moodState.currentMood;
+export interface FullResponseResult {
+    introResponse: string;
+    aiResponse: string;
+    responseMood: Mood;
+    newState: MoodState;
+    shouldChangeMood: boolean;
+    isApproaching: boolean;
+}
 
-    if (moodState.currentMood === 'neutral') {
-        if (detectedMood !== 'neutral') {
-            const currentScore = moodState.scores[detectedMood as Mood] || 0;
-            if (currentScore + 1 >= 2) {
-                willChangeMood = true;
-                newMood = detectedMood;
-            }
+interface GrokApiPayload {
+    prompt: string;
+    currentMood: Mood;
+    responseMood: Mood;
+    isApproaching?: boolean;
+    pendingMood?: Mood;
+    approachProgress?: number;
+    approachThreshold?: number;
+    approachLabel?: string;
+    messages: { isUser: boolean; text: string }[];
+}
+
+async function callGrokApi(payload: GrokApiPayload): Promise<{ response: string; detectedMood: Mood }> {
+    const response = await fetch('/api/grok', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error Details:', errorText);
+        let detail = errorText;
+        try {
+            const parsed = JSON.parse(errorText) as { error?: string };
+            if (parsed.error) detail = parsed.error;
+        } catch {
+            /* keep raw */
         }
-    } else {
-        if (detectedMood !== moodState.currentMood) {
-            const neutralScore = moodState.scores['neutral'] || 0;
-            if (neutralScore + 1 >= 2) {
-                willChangeMood = true;
-                newMood = 'neutral';
-            }
-        }
+        throw new Error(detail);
     }
 
-    return { willChangeMood, newMood };
-};
+    const data = await response.json();
+    return {
+        response: data.response as string,
+        detectedMood: data.detectedMood as Mood,
+    };
+}
+
+function buildApiPayload(
+    userInput: string,
+    state: MoodState,
+    messages: { isUser: boolean; text: string }[]
+): GrokApiPayload {
+    const isApproaching = state.phase === 'approaching';
+    const isCooling = state.phase === 'cooling';
+
+    return {
+        prompt: userInput,
+        currentMood: state.currentMood,
+        responseMood: state.currentMood,
+        isApproaching: isApproaching || isCooling,
+        pendingMood: state.pendingMood,
+        approachProgress: state.progressScore,
+        approachThreshold: getApproachThresholdForState(state),
+        approachLabel: getApproachLabel(state),
+        messages,
+    };
+}
 
 export const generateFullResponse = async (
     userInput: string,
     moodState: MoodState,
     messages: { isUser: boolean; text: string }[] = []
-): Promise<{ introResponse: string; aiResponse: string; detectedMood: Mood }> => {
-    let introResponse = '';
+): Promise<FullResponseResult> => {
+    const state = normalizeMoodState(moodState);
 
     try {
-        const response = await fetch('/api/grok', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                prompt: userInput,
-                currentMood: moodState.currentMood,
-                upcomingMood: undefined,
-                messages: messages
-            }),
-        });
+        const first = await callGrokApi(buildApiPayload(userInput, state, messages));
+        const commit = commitTurn(state, first.detectedMood, userInput);
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('API Error Details:', errorText);
-            throw new Error('API call failed');
-        }
+        let introResponse = '';
+        let aiResponse = first.response;
+        let responseMood = commit.newState.currentMood;
 
-        const data = await response.json();
-        const detectedMood = data.detectedMood;
+        if (commit.shouldChangeMood && commit.transitionTarget) {
+            introResponse = generatePredefinedResponse(commit.transitionTarget);
+            responseMood = commit.transitionTarget;
 
-        const { willChangeMood, newMood } = calculateMoodTransition(moodState, detectedMood);
-
-        if (willChangeMood) {
-            introResponse = generatePredefinedResponse(newMood);
-
-            const secondResponse = await fetch('/api/grok', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    prompt: userInput,
-                    currentMood: moodState.currentMood,
-                    upcomingMood: newMood,
-                    messages: messages
-                }),
+            const settled = await callGrokApi({
+                ...buildApiPayload(userInput, commit.newState, messages),
+                currentMood: commit.transitionTarget,
+                responseMood: commit.transitionTarget,
+                isApproaching: false,
+                pendingMood: undefined,
+                approachProgress: 0,
+                approachThreshold: undefined,
+                approachLabel: undefined,
             });
-
-            if (secondResponse.ok) {
-                const secondData = await secondResponse.json();
-                return {
-                    introResponse,
-                    aiResponse: secondData.response,
-                    detectedMood: detectedMood
-                };
-            }
+            aiResponse = settled.response;
         }
 
         return {
             introResponse,
-            aiResponse: data.response,
-            detectedMood: detectedMood
+            aiResponse,
+            responseMood,
+            newState: commit.newState,
+            shouldChangeMood: commit.shouldChangeMood,
+            isApproaching: commit.newState.phase === 'approaching',
         };
     } catch (error) {
         console.error('Error calling Grok API:', error);
+        const detail =
+            error instanceof Error ? error.message : 'Sorry, I encountered an error while processing your request.';
         return {
-            introResponse,
-            aiResponse: 'Sorry, I encountered an error while processing your request.',
-            detectedMood: moodState.currentMood
+            introResponse: '',
+            aiResponse: detail,
+            responseMood: state.currentMood,
+            newState: state,
+            shouldChangeMood: false,
+            isApproaching: false,
         };
     }
 };

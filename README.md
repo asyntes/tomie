@@ -1,137 +1,207 @@
 # Tomie
 
-Interactive AI terminal interface using Next.js, React, and xAI’s Grok API with custom prompts. Tomie responds in various emotional states, each with distinct personalities, visuals, and behaviors. 
+Interactive AI terminal interface built with Next.js and React. Tomie is a character powered by xAI Grok: she replies in a retro terminal UI with distinct moods, each with its own personality, colors, and eye expressions.
+
 ## Features
 
-- **Mood-Based AI Responses**: Tomie analyzes user input and responds with different emotional states
-- **Dynamic Visual Feedback**: Eye expressions and color themes change based on Tomie's current mood
-- **Terminal-Style Interface**: Retro command-line aesthetic with typing animations
-- **Built-in Commands**: System commands for navigation and interaction
-- **Real-time Interaction**: Instant mood analysis and contextual responses
-- **Smart Input Management**: Input disabled during processing with visual feedback
-- **Multilingual Support**: Automatic language detection with Italian and English support
+- **Mood-based responses** — Five emotional states with dedicated prompts and visuals
+- **Gradual mood transitions** — Approaching / cooling phases; UI changes only when thresholds are met
+- **LLM-only mood detection** — No regex or word lists on user input in TypeScript; Grok emits `[MOOD:emotion]` and a state machine counts repeated tags
+- **Tone vs tag separation** — Speaking style follows `responseMood`; the tag reflects user input tendency
+- **Single API call per message** — One Grok request per user turn (transition system intro when mood changes)
+- **Terminal aesthetic** — Typing animation, custom cursor, mood-themed styling, short glitch/interference burst on mood change (~0.5s, plays once)
+- **Built-in commands** — `/clear`, `/help`, `/repo`, `/privacy`
+- **i18n** — Italian and English (browser language detection)
 
-## Mood States
+## Mood states
 
-Tomie can express five different emotional states:
+| Mood | Theme | Typical trigger (via `[MOOD:]` tags) |
+|------|-------|--------------------------------------|
+| **Neutral** | Blue | Normal chat, factual questions |
+| **Angry** | Red | Sustained hostility (2 tags) |
+| **Romantic** | Purple | Explicit flirt / love (3 tags; slowest to enter) |
+| **Excited** | Orange | Enthusiasm (2 tags) |
+| **Confused** | Green | Unclear or lost user (2 tags) |
 
-- **Neutral** - Default calm state with blue theme
-- **Angry** - Triggered by hostile input with red theme  
-- **Romantic** - Develops when building rapport with purple theme
-- **Excited** - Shows enthusiasm with orange theme
-- **Confused** - Appears when uncertain with green theme
+Each mood has unique colors, SVG eyes, and prompt personality definitions in `src/app/services/ai/prompts/`.
 
-Each mood state features unique:
-- Color schemes and visual styling
-- Eye expressions and animations
-- Response patterns and personality traits
+## How mood transitions work
 
-## Language Support
+Logic lives in [`src/app/core/moodStateMachine.ts`](src/app/core/moodStateMachine.ts). Configuration: `MOOD_TRANSITION_CONFIG`.
 
-Tomie automatically detects your browser language and adapts the interface accordingly:
+```mermaid
+stateDiagram-v2
+    [*] --> neutral
+    neutral --> approaching: first non-neutral [MOOD:] tag
+    approaching --> angry: threshold reached (2x hostile tags; romantic 3x)
+    approaching --> neutral: neutral tag decays progress
+    angry --> cooling: first [MOOD:neutral]
+    cooling --> neutral: exit threshold reached
+```
 
-- **English**: Default language with full functionality
-- **Italian (Italiano)**: Complete interface translation including welcome messages, commands, and mood indicators
-- **Automatic Detection**: Uses browser language settings to determine the appropriate language
-- **Fallback Support**: Defaults to English for unsupported languages
+| Phase | Visual UI | Behavior |
+|-------|-----------|----------|
+| **Stable** | Current mood colors/eyes | Normal replies for `currentMood` |
+| **Approaching** | Unchanged | Prompt hints at pending mood; `responseMood` stays on current mood |
+| **Transition** | Glitch + intro line | Full new personality; `responseMood` switches |
+| **Cooling** | Unchanged | Leaving a non-neutral mood toward neutral |
 
-### Translated Elements
+### Thresholds
 
-- Terminal initialization messages
-- System commands and responses
-- Help documentation and privacy policy
-- Mood state indicators (NEUTRAL, ANGRY, ROMANTIC, EXCITED, CONFUSED.)
-- User interface elements and placeholders
+| Direction | All moods (angry, romantic, excited, confused) |
+|-----------|--------------------------------------------------|
+| Enter (from neutral) | 2 tags (angry, excited, confused); **3 tags** for romantic |
+| Exit (to neutral) | 2 consecutive `[MOOD:neutral]` tags |
 
-## Available Commands
+**Important:** Progress uses only `detectedMood` from the API (parsed from `[MOOD:…]` in Grok’s reply). If the UI stays on neutral, inspect the `/api/grok` response — the model may be tagging `[MOOD:neutral]` too often.
 
-- `/clear` - Clear terminal and reset memory
-- `/help` - Display available commands and usage information
-- `/repo` - Open GitHub repository in a new tab
-- `/privacy` - Display privacy policy and data usage information
+Mismatch handling: a `[MOOD:neutral]` tag while approaching decays progress gradually (no hard reset).
 
-## Getting Started
+### Trying moods manually
+
+After `/clear`, send **two messages in a row** with the same emotional tone. The first starts **approaching** (UI unchanged); the second completes the transition (glitch + new colors).
+
+| Target mood | Example inputs (×2) |
+|-------------|---------------------|
+| Excited | `WOW è INCREDIBILE!!!` |
+| Confused | `Non capisco cosa intendi` |
+| Romantic | 3 explicit flirt/love messages in a row |
+| Angry | Sustained hostility / insults |
+
+## Environment variables
+
+Create `.env.local`:
+
+```bash
+XAI_API_KEY=your_xai_api_key_here
+XAI_MODEL=grok-4.20-0309-non-reasoning
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `XAI_API_KEY` | Yes | xAI API key from [console.x.ai](https://console.x.ai) |
+| `XAI_MODEL` | No | Chat model id (default: `grok-4.20-0309-non-reasoning`) |
+
+If the API returns a model error, set `XAI_MODEL` to a model enabled for your team in the xAI console.
+
+## Getting started
 
 ### Prerequisites
 
-- Node.js 18+ 
-- npm or yarn package manager
+- Node.js 18+
+- npm
 
 ### Installation
 
-1. Clone the repository:
 ```bash
 git clone https://github.com/asyntes/tomie.git
 cd tomie
-```
-
-2. Install dependencies:
-```bash
 npm install
 ```
 
-This includes the OpenAI SDK which is used to interface with xAI's Grok API.
+Copy env vars into `.env.local` (see above), then:
 
-3. Set up environment variables:
-```bash
-# Create .env.local and add your xAI API key
-XAI_API_KEY=your_xai_api_key_here
-```
-
-4. Start the development server:
 ```bash
 npm run dev
 ```
 
-5. Open [http://localhost:3000](http://localhost:3000) in your browser
+Open [http://localhost:3000](http://localhost:3000).
 
 ## Scripts
 
-- `npm run dev` - Start development server with Turbopack
-- `npm run build` - Build production application  
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint checks
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Dev server (Turbopack) |
+| `npm run build` | Production build |
+| `npm run start` | Production server |
+| `npm run lint` | ESLint |
+| `npm test` | Vitest — state machine, mood tag parser, scenarios |
+| `npm run test:eval` | Optional LLM-as-judge evals (see below) |
 
-## Technology Stack
+### Optional LLM evals
 
-- **Next.js 15** - React framework with App Router
-- **React 19** - UI library with modern hooks
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first styling
-- **OpenAI SDK** - Client library for API interactions
-- **xAI Grok API** - AI responses powered by Grok-3-Mini
-- **Custom i18n System** - Automatic language detection and translation support
-- **ESLint** - Code linting and formatting
+Integration-style checks with Grok as judge (costs API tokens):
 
-## AI Personality & Prompt Engineering
+```bash
+RUN_LLM_EVALS=1 npm run test:eval
+```
 
-Tomie's personality is driven by sophisticated prompt engineering that creates distinct behavioral patterns for each mood state:
+Requires `XAI_API_KEY`. Evals live in `src/app/evals/*.eval.ts`.
 
-### Mood-Based Personalities
+## Architecture
 
-- **Neutral**: Cool, elegant, sophisticated with subtle wit and intelligence
-- **Angry**: Irritated, impatient, sharp tone with strong language capability
-- **Romantic**: Deeply affectionate and in love, expressing romantic feelings elegantly
-- **Excited**: Energetic, enthusiastic, fast-paced with capital letters for emphasis
-- **Confused**: Uncertain, seeking clarification with technical processing difficulties
+### Mood pipeline (per user message)
 
-### Advanced Features
+```
+TomieTerminal
+  → responseHandler.generateFullResponse
+      → moodStateMachine.previewTurn(state)     # pick responseMood for this turn
+      → POST /api/grok                          # GrokService + PromptGenerator
+      → moodDetector.extractMoodFromResponse    # [MOOD:] → detectedMood
+      → moodStateMachine.commitTurn(state, tag) # update progress / transition
+  → UI: brief interference (~550ms) + setMoodState if shouldChangeMood
+```
 
-- **Language-Aware Responses**: Automatically matches user's language (Italian/English)
-- **Context-Aware Conversations**: Maintains conversation history for coherent interactions
-- **Mood Detection**: Analyzes user input to determine appropriate emotional responses
-- **Personality Consistency**: Maintains character traits while transitioning between moods
-- **Dynamic Prompt Generation**: Creates context-specific prompts based on current and upcoming mood states
+### Key files
 
-### Internationalization (i18n)
+| Path | Role |
+|------|------|
+| [`src/app/core/moodStateMachine.ts`](src/app/core/moodStateMachine.ts) | Thresholds, approaching/cooling, `previewTurn` / `commitTurn` |
+| [`src/app/core/moodSignalResolver.ts`](src/app/core/moodSignalResolver.ts) | Maps model tag → state machine signal (no input parsing) |
+| [`src/app/core/responseHandler.ts`](src/app/core/responseHandler.ts) | One fetch per message, intro on transition |
+| [`src/app/core/normalizeMoodState.ts`](src/app/core/normalizeMoodState.ts) | Safe state shape after hot reload |
+| [`src/app/core/stateManager.ts`](src/app/core/stateManager.ts) | Initial state + thin wrapper over `commitTurn` |
+| [`src/app/services/ai/grokService.ts`](src/app/services/ai/grokService.ts) | xAI client, model from env |
+| [`src/app/services/ai/promptGenerator.ts`](src/app/services/ai/promptGenerator.ts) | System prompt: `responseMood`, approaching, tag rules |
+| [`src/app/services/ai/moodDetector.ts`](src/app/services/ai/moodDetector.ts) | Parse and strip `[MOOD:…]` |
+| [`src/app/services/ai/prompts/moodPersonalities.ts`](src/app/services/ai/prompts/moodPersonalities.ts) | Personalities + tag guidelines for the model |
+| [`src/app/components/TomieTerminal/TomieTerminal.tsx`](src/app/components/TomieTerminal/TomieTerminal.tsx) | UI, typing, mood visuals |
 
-The application features a custom-built internationalization system:
+### Tests
 
-- **Automatic Language Detection**: Uses `navigator.language` to detect browser language on initialization
-- **Translation Files**: JSON-based translation system (`en.json`, `it.json`) in `src/app/i18n/`
-- **Custom Hook**: `useI18n()` provides translation functions and language management
-- **Type-Safe Translations**: Full TypeScript support with proper type definitions
-- **Performance Optimized**: Uses `useMemo` for efficient message caching and re-rendering
+| Path | Type |
+|------|------|
+| `src/app/core/__tests__/moodStateMachine.test.ts` | Unit — thresholds, approaching, decay |
+| `src/app/core/__tests__/moodTransitionScenarios.test.ts` | Unit — multi-turn tag sequences |
+| `src/app/services/ai/__tests__/moodDetector.test.ts` | Unit — tag parsing |
+| `src/app/evals/moodJudge.eval.ts` | Optional LLM judge |
+
+## Commands
+
+- `/clear` — Clear terminal and reset mood state
+- `/help` — Command list
+- `/repo` — Open GitHub repo
+- `/privacy` — Privacy policy
+
+## Technology stack
+
+- Next.js 15 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS 4
+- OpenAI SDK → xAI endpoint (`https://api.x.ai/v1`)
+- Vitest
+- Custom i18n (`src/app/i18n/`)
+
+## AI prompts
+
+- **Personalities** — Per-mood voice in `moodPersonalities.ts`
+- **Tag rules** — Mandatory `[MOOD:]` on every reply; guidelines + examples teach Grok when to use each tag (not runtime keyword matching)
+- **Language** — Replies match user language (IT/EN)
+- **Approaching** — Subtle tone shift + hint to keep tagging the pending mood when the user continues the same tone
+- **Tone vs tag** — Response text uses `responseMood`; the tag labels user input only
+
+## Project structure (summary)
+
+```
+src/app/
+├── api/grok/route.ts          # API route
+├── components/TomieTerminal/  # Main UI
+├── core/                      # State machine, response handler, mood config
+├── services/ai/               # Grok, prompts, mood tag parsing
+├── types/                     # Mood, AI, message types
+└── i18n/                      # en.json, it.json
+```
 
 ## License
 

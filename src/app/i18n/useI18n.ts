@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import enTranslations from './en.json';
 import itTranslations from './it.json';
 
@@ -63,7 +63,13 @@ const detectLanguage = (): Language => {
 };
 
 export const useI18n = () => {
-  const [language, setLanguage] = useState<Language>(detectLanguage);
+  const [language, setLanguage] = useState<Language>('en');
+  const [isLocaleReady, setIsLocaleReady] = useState(false);
+
+  useEffect(() => {
+    setLanguage(detectLanguage());
+    setIsLocaleReady(true);
+  }, []);
 
   const t = (key: string, params?: Record<string, string>): string => {
     const keys = key.split('.');
@@ -131,5 +137,6 @@ export const useI18n = () => {
     setLanguage,
     t,
     formatPrivacyPolicy,
+    isLocaleReady,
   };
 };

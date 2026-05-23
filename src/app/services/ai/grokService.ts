@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { Mood } from '../../types/mood';
 import { AIRequest, AIResponse, AIMessage, AIServiceConfig } from './types';
 import { MoodDetector } from './moodDetector';
 import { PromptGenerator } from './promptGenerator';
@@ -21,23 +22,38 @@ export class GrokService {
       throw new Error('XAI_API_KEY environment variable is not set');
     }
 
+    const model =
+      process.env.XAI_MODEL?.trim() || 'grok-4.20-0309-non-reasoning';
+
     return new GrokService({
       apiKey,
       baseURL: 'https://api.x.ai/v1',
-      model: 'grok-4-fast-non-reasoning',
+      model,
       temperature: 0,
       top_p: 0.95,
       max_tokens: 2048,
     });
   }
 
+  private resolveResponseMood(request: AIRequest): Mood {
+    return request.responseMood ?? request.upcomingMood ?? request.currentMood;
+  }
+
   private buildConversationMessages(request: AIRequest): AIMessage[] {
     const conversationMessages: AIMessage[] = [];
 
-    const systemPrompt = PromptGenerator.generateSystemPrompt(
-      request.currentMood,
-      request.upcomingMood
-    );
+    const responseMood = this.resolveResponseMood(request);
+
+    const systemPrompt = PromptGenerator.generateSystemPrompt({
+      currentMood: request.currentMood,
+      responseMood,
+      isApproaching: request.isApproaching,
+      pendingMood: request.pendingMood,
+      approachProgress: request.approachProgress,
+      approachThreshold: request.approachThreshold,
+      approachLabel: request.approachLabel,
+      userMessage: request.prompt,
+    });
 
     conversationMessages.push({ role: 'system', content: systemPrompt });
 
@@ -85,7 +101,25 @@ export class GrokService {
       };
     } catch (error) {
       console.error('Error calling Grok API:', error);
-      throw new Error('Failed to generate response');
+      const message = GrokService.formatApiError(error);
+      throw new Error(message);
     }
+  }
+
+  private static formatApiError(error: unknown): string {
+    if (error && typeof error === 'object' && 'status' in error) {
+      const apiError = error as { status?: number; message?: string; error?: { message?: string } };
+      const detail = apiError.error?.message ?? apiError.message;
+      if (apiError.status === 404 && detail) {
+        return `Model unavailable: ${detail}. Set XAI_MODEL in .env.local to a model enabled for your key (see console.x.ai).`;
+      }
+      if (detail) {
+        return `Grok API error: ${detail}`;
+      }
+    }
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+    return 'Failed to generate response';
   }
 }

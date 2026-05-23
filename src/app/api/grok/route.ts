@@ -19,8 +19,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        const message =
+            error instanceof Error ? error.message : 'Failed to generate response';
+
         return NextResponse.json(
-            { error: 'Failed to generate response' },
+            { error: message },
             { status: 500 }
         );
     }

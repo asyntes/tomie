@@ -4,7 +4,8 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { moodColors, moodEyes } from '../../core/moodConfig';
 import { generateFullResponse } from '../../core/responseHandler';
-import { createInitialMoodState, updateMoodState } from '../../core/stateManager';
+import { createInitialMoodState } from '../../core/stateManager';
+import { normalizeMoodState } from '../../core/normalizeMoodState';
 import { generateMoodStyles } from './utils/moodStyleGenerator';
 import { typeMessage } from './utils/typingEffect';
 import { handleCommand } from './utils/terminalCommands';
@@ -19,7 +20,7 @@ import styles from './TomieTerminal.module.css';
 
 export default function TomieTerminal() {
     const [input, setInput] = useState('');
-    const [moodState, setMoodState] = useState<MoodState>(createInitialMoodState());
+    const [moodState, setMoodState] = useState<MoodState>(() => createInitialMoodState());
     const [isTyping, setIsTyping] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     const [inputFocused, setInputFocused] = useState(false);
@@ -27,7 +28,10 @@ export default function TomieTerminal() {
     const [showInterference, setShowInterference] = useState(false);
     const [showLoadingDots, setShowLoadingDots] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const transitionFxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [cursorPosition, setCursorPosition] = useState(0);
+
+    const MOOD_TRANSITION_FX_MS = 550;
 
     const { isInitialized, isSafari, isTouchDevice, messages, setMessages } = useTerminalSetup(inputRef);
     const { messagesEndRef } = useMessageHandling(messages);
@@ -62,6 +66,14 @@ export default function TomieTerminal() {
             updateCursorPosition();
         }
     }, [input, inputFocused, isTouchDevice, updateCursorPosition]);
+
+    useEffect(() => {
+        return () => {
+            if (transitionFxTimeoutRef.current) {
+                clearTimeout(transitionFxTimeoutRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         const handleResize = () => {
@@ -116,9 +128,32 @@ export default function TomieTerminal() {
 
         const conversationMessages = messages.filter(msg => !('isSystemGenerated' in msg && msg.isSystemGenerated));
 
-        const { introResponse, aiResponse, detectedMood } = await generateFullResponse(input, moodState, conversationMessages);
+        const safeMoodState = normalizeMoodState(moodState);
+
+        const {
+            introResponse,
+            aiResponse,
+            newState,
+            shouldChangeMood,
+        } = await generateFullResponse(input, safeMoodState, conversationMessages);
 
         setShowLoadingDots(false);
+
+        if (shouldChangeMood) {
+            if (transitionFxTimeoutRef.current) {
+                clearTimeout(transitionFxTimeoutRef.current);
+            }
+            setShowInterference(true);
+            setIsGlitching(true);
+            setMoodState(newState);
+            transitionFxTimeoutRef.current = setTimeout(() => {
+                setShowInterference(false);
+                setIsGlitching(false);
+                transitionFxTimeoutRef.current = null;
+            }, MOOD_TRANSITION_FX_MS);
+        } else {
+            setMoodState(newState);
+        }
 
         if (introResponse) {
             const introMessage: Message = {
@@ -126,46 +161,28 @@ export default function TomieTerminal() {
                 text: '',
                 isUser: false,
                 timestamp: new Date(),
-                mood: moodState.currentMood,
+                mood: newState.currentMood,
                 isSystemGenerated: true
             };
 
             setMessages(prev => [...prev, introMessage]);
             await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-            await typeMessage(introResponse, moodState.currentMood, setMessages, setIsTyping, inputRef, isTouchDevice);
+            await typeMessage(introResponse, newState.currentMood, setMessages, setIsTyping, inputRef, isTouchDevice);
         }
+
+        const displayMood = newState.currentMood;
 
         const grokMessage: Message = {
             id: (Date.now() + 2).toString(),
             text: '',
             isUser: false,
             timestamp: new Date(),
-            mood: detectedMood
+            mood: displayMood
         };
 
         setMessages(prev => [...prev, grokMessage]);
         await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-        await typeMessage(aiResponse, detectedMood, setMessages, setIsTyping, inputRef, isTouchDevice);
-
-        const { newState, shouldChangeMood } = updateMoodState(moodState, detectedMood);
-
-        if (shouldChangeMood) {
-            setShowInterference(true);
-            setIsGlitching(true);
-
-            setTimeout(() => {
-                setMoodState(newState);
-                setTimeout(() => {
-                    setIsGlitching(false);
-                    setTimeout(() => {
-                        setShowInterference(false);
-                    }, 200);
-                }, 300);
-            }, 150);
-        } else {
-            setMoodState(newState);
-        }
-
+        await typeMessage(aiResponse, displayMood, setMessages, setIsTyping, inputRef, isTouchDevice);
 
         setIsProcessing(false);
     };

@@ -5,18 +5,22 @@ export class MoodDetector {
     'neutral', 'angry', 'romantic', 'excited', 'confused'
   ];
 
+  private static readonly MOOD_TAG_PATTERN = /\[MOOD:\s*(\w+)\s*\]/gi;
+
   static extractMoodFromResponse(text: string): Mood {
-    const moodMarkers = text.match(/\[MOOD:(\w+)\]/);
-    if (moodMarkers && moodMarkers[1]) {
-      const detectedMood = moodMarkers[1].toLowerCase() as Mood;
-      if (this.VALID_MOODS.includes(detectedMood)) {
-        return detectedMood;
-      }
+    const matches = [...text.matchAll(this.MOOD_TAG_PATTERN)];
+    if (matches.length === 0) {
+      return 'neutral';
+    }
+    const lastMatch = matches[matches.length - 1];
+    const raw = lastMatch[1]?.toLowerCase() as Mood;
+    if (this.VALID_MOODS.includes(raw)) {
+      return raw;
     }
     return 'neutral';
   }
 
   static cleanResponse(text: string): string {
-    return text.replace(/\[MOOD:\w+\]/g, '').trim();
+    return text.replace(this.MOOD_TAG_PATTERN, '').replace(/\s+/g, ' ').trim();
   }
 }

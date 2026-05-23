@@ -12,9 +12,13 @@ export interface MoodScore {
     count: number;
 }
 
+export type MoodPhase = 'stable' | 'approaching' | 'cooling';
+
 export interface MoodState {
     currentMood: Mood;
     scores: Record<Mood, number>;
     lastDetectedMood: Mood;
-    nonMatchingCount: number;
+    phase: MoodPhase;
+    pendingMood?: Mood;
+    progressScore: number;
 }
