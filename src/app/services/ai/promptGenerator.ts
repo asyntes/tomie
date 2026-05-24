@@ -5,6 +5,7 @@ import {
   PRIVACY_INFO,
   MOOD_PERSONALITIES,
   MOOD_DETECTION_GUIDELINES,
+  MOOD_TAGGING_REMINDER,
 } from './prompts';
 
 export interface PromptContext {
@@ -28,18 +29,46 @@ function getApproachingInstructions(
 
   if (pendingMood === 'romantic') {
     return `${trajectory}: You are still in ${currentMood.toUpperCase()} — NOT romantic yet.
-FORBIDDEN in your reply: love declarations, "ti amo", pet names (tesoro, amore, darling), possessiveness, jealousy, saying you miss them, calling them yours, acting obsessed.
-Stay composed, elegant, and mostly NEUTRAL in tone. At most a faint extra warmth — no flirting back.
-Tag [MOOD:romantic] only if they clearly flirt or declare attraction again; generic compliments or thanks → [MOOD:neutral].`;
+FORBIDDEN in your reply: love declarations, "ti amo", pet names (tesoro, amore, darling), possessiveness, jealousy, saying you miss them, calling them yours.
+Stay composed, elegant, mostly NEUTRAL in tone. At most a faint extra warmth — no flirting back.
+If the user keeps flirting or says ti amo / ti desidero, you MUST tag [MOOD:romantic]. Generic thanks or "sei brava" → [MOOD:neutral].`;
   }
 
   if (pendingMood === 'angry') {
     return `${trajectory}: Stay in ${currentMood.toUpperCase()} tone. No profanity yet — RESPONSE mood is still ${currentMood.toUpperCase()}. Slight edge at most.
-If the user is still hostile or insulting, you MUST tag [MOOD:angry]. Use [MOOD:neutral] only if they clearly calmed down or changed topic.`;
+If the user keeps insulting or swearing at you, you MUST tag [MOOD:angry]. Only [MOOD:neutral] if they clearly apologized or changed topic.`;
   }
 
-  return `${trajectory}: Stay in ${currentMood.toUpperCase()} visually and in core tone. Only a subtle hint of ${pendingMood.toUpperCase()} — do not fully switch personality yet.
-If the user keeps the same ${pendingMood} tone, you MUST tag [MOOD:${pendingMood}]. Use [MOOD:neutral] only if they clearly changed topic or tone.`;
+  if (pendingMood === 'excited') {
+    return `${trajectory}: Stay in ${currentMood.toUpperCase()} tone — not full hype yet. Slightly more energy at most.
+If the user keeps celebrating, using WOW, exclamation marks, or sharing exciting news, you MUST tag [MOOD:excited].`;
+  }
+
+  if (pendingMood === 'confused') {
+    return `${trajectory}: Stay in ${currentMood.toUpperCase()} tone — not full confusion yet. Stay mostly clear in your reply.
+If the user still says they do not understand, are lost, or asks what you mean, you MUST tag [MOOD:confused].`;
+  }
+
+  return `${trajectory}: Stay in ${currentMood.toUpperCase()} tone. If the user keeps the same ${pendingMood} tone, tag [MOOD:${pendingMood}].`;
+}
+
+function buildUserTaggingBlock(userMessage: string, pendingMood?: Mood): string {
+  const lines = [
+    '',
+    '=== CLASSIFY THIS USER MESSAGE (for [MOOD:] tag only) ===',
+    `"${userMessage}"`,
+    'Pick the tag that matches the USER message tone (see Mood Detection guidelines).',
+    'Wrong [MOOD:neutral] when the user is hostile, flirting, hyped, or confused blocks the mood UI.',
+  ];
+
+  if (pendingMood) {
+    lines.push(
+      `We are approaching ${pendingMood.toUpperCase()}. If this message continues that tone, tag [MOOD:${pendingMood}] — not [MOOD:neutral].`
+    );
+  }
+
+  lines.push('=== END USER MESSAGE ===');
+  return lines.join('\n');
 }
 
 export class PromptGenerator {
@@ -57,14 +86,7 @@ export class PromptGenerator {
     const activePersonality = MOOD_PERSONALITIES[responseMood];
 
     const userTaggingBlock = userMessage
-      ? [
-          '',
-          '=== USER MESSAGE (classify for [MOOD:] tag) ===',
-          `"${userMessage}"`,
-          'If this message contains insults, profanity, or hostility directed at you, you MUST end with [MOOD:angry].',
-          'Never use [MOOD:neutral] for insults or "vaffanculo"/"fottiti"/similar.',
-          '=== END USER MESSAGE ===',
-        ].join('\n')
+      ? buildUserTaggingBlock(userMessage, isApproaching ? pendingMood : undefined)
       : '';
 
     const basePrompt = [
@@ -78,10 +100,11 @@ export class PromptGenerator {
       '',
       MOOD_DETECTION_GUIDELINES,
       '',
+      MOOD_TAGGING_REMINDER,
+      '',
       `Current AI mood state (UI/visual): ${currentMood}`,
       `You MUST write in the tone of ${responseMood.toUpperCase()} mood only — same as current UI mood.`,
-      'The [MOOD:] tag at the end labels the USER last message tone; it does not change your reply tone.',
-      'Do not use personality traits from other moods that are not listed above.',
+      'The [MOOD:] tag labels the USER last message; it does not set your reply tone.',
       userTaggingBlock,
     ].join('\n');
 

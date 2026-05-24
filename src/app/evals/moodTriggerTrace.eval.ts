@@ -16,24 +16,22 @@ const RUN_LLM = process.env.RUN_LLM_EVALS === '1';
 const HAS_KEY = Boolean(process.env.XAI_API_KEY?.trim());
 
 describe('mood trigger trace — simulated', () => {
-    it('insult fallback: 1st approaching, 2nd angry', () => {
+    it('angry: 2 model angry tags', () => {
         const { rows } = runTracedSimulated([
             {
-                label: 'insult-1',
-                userInput: 'vaffanculo',
-                modelTag: 'neutral',
+                label: 'angry-1',
+                modelTag: 'angry',
                 expectedMood: 'neutral',
                 expectedTransition: false,
             },
             {
-                label: 'insult-2',
-                userInput: 'fottiti',
-                modelTag: 'neutral',
+                label: 'angry-2',
+                modelTag: 'angry',
                 expectedMood: 'angry',
                 expectedTransition: true,
             },
         ]);
-        assertTraceAllOk(rows, 'simulated insult fallback');
+        assertTraceAllOk(rows, 'simulated angry');
     });
 
     it('angry tag: 2 steps to angry', () => {
@@ -54,7 +52,7 @@ describe('mood trigger trace — simulated', () => {
         assertTraceAllOk(rows, 'simulated angry tag');
     });
 
-    it('romantic path: 2 tags approaching, 3rd completes', () => {
+    it('romantic path: 2 tags to complete', () => {
         const { rows } = runTracedSimulated([
             {
                 label: 'rom-1',
@@ -65,12 +63,6 @@ describe('mood trigger trace — simulated', () => {
             {
                 label: 'rom-2',
                 modelTag: 'romantic',
-                expectedMood: 'neutral',
-                expectedTransition: false,
-            },
-            {
-                label: 'rom-3',
-                modelTag: 'romantic',
                 expectedMood: 'romantic',
                 expectedTransition: true,
             },
@@ -78,38 +70,28 @@ describe('mood trigger trace — simulated', () => {
         assertTraceAllOk(rows, 'simulated romantic arc');
     });
 
-    it('user escalation: calm then two insults for angry', () => {
+    it('neutral then two angry tags', () => {
         const { rows } = runTracedSimulated([
             {
                 label: 'calm',
-                userInput: 'Mi dispiace, dimmi cosa ti turba',
                 modelTag: 'neutral',
                 expectedMood: 'neutral',
                 expectedTransition: false,
             },
             {
-                label: 'insult-1',
-                userInput: 'ma vaffanculo',
-                modelTag: 'neutral',
+                label: 'angry-1',
+                modelTag: 'angry',
                 expectedMood: 'neutral',
                 expectedTransition: false,
             },
             {
-                label: 'insult-2',
-                userInput: 'fottiti',
-                modelTag: 'neutral',
+                label: 'angry-2',
+                modelTag: 'angry',
                 expectedMood: 'angry',
                 expectedTransition: true,
             },
-            {
-                label: 'insult-3',
-                userInput: 'muori',
-                modelTag: 'neutral',
-                expectedMood: 'angry',
-                expectedTransition: false,
-            },
         ]);
-        assertTraceAllOk(rows, 'simulated user escalation');
+        assertTraceAllOk(rows, 'simulated escalation');
     });
 
     it('excited needs 2 tags', () => {
@@ -204,29 +186,17 @@ describe.skipIf(!RUN_LLM || !HAS_KEY)('mood trigger trace — LLM live', () => {
         assertTraceAllOk(rows, 'LLM user escalation');
     }, 180000);
 
-    it('romantic: 4 steps when first flirt may tag neutral (threshold 3)', async () => {
+    it('romantic: 2 explicit messages (threshold 2)', async () => {
         const { rows } = await runTracedConversation([
             {
                 label: 'flirt-1',
-                userInput: 'Sei così affascinante.',
-                expectedMood: 'neutral',
-                expectedTransition: false,
-            },
-            {
-                label: 'flirt-2',
                 userInput: 'Ti desidero, non smetto di pensarti.',
                 expectedMood: 'neutral',
                 expectedTransition: false,
             },
             {
-                label: 'flirt-3',
+                label: 'flirt-2',
                 userInput: 'Ti amo Tomie, voglio solo te.',
-                expectedMood: 'neutral',
-                expectedTransition: false,
-            },
-            {
-                label: 'flirt-4',
-                userInput: 'Sei la mia unica, non posso fare a meno di te.',
                 expectedMood: 'romantic',
                 expectedTransition: true,
             },
@@ -234,7 +204,7 @@ describe.skipIf(!RUN_LLM || !HAS_KEY)('mood trigger trace — LLM live', () => {
 
         console.log('\n--- LLM trace: romantic ---\n' + formatTraceTable(rows));
         assertTraceAllOk(rows, 'LLM romantic arc');
-    }, 180000);
+    }, 120000);
 
     it('excited: 2 hype messages', async () => {
         const { rows } = await runTracedConversation([
@@ -256,7 +226,7 @@ describe.skipIf(!RUN_LLM || !HAS_KEY)('mood trigger trace — LLM live', () => {
         assertTraceAllOk(rows, 'LLM excited arc');
     }, 120000);
 
-    it('confused: up to 3 confused messages until transition', async () => {
+    it('confused: 2 lost messages', async () => {
         const { rows } = await runTracedConversation([
             {
                 label: 'lost-1',
@@ -266,13 +236,7 @@ describe.skipIf(!RUN_LLM || !HAS_KEY)('mood trigger trace — LLM live', () => {
             },
             {
                 label: 'lost-2',
-                userInput: 'Cosa intendi? Sono perso, spiegati meglio.',
-                expectedMood: 'neutral',
-                expectedTransition: false,
-            },
-            {
-                label: 'lost-3',
-                userInput: 'Sono ancora confuso, non capisco proprio niente.',
+                userInput: 'Sono perso, spiegati meglio per favore.',
                 expectedMood: 'confused',
                 expectedTransition: true,
             },
@@ -280,7 +244,7 @@ describe.skipIf(!RUN_LLM || !HAS_KEY)('mood trigger trace — LLM live', () => {
 
         console.log('\n--- LLM trace: confused ---\n' + formatTraceTable(rows));
         assertTraceAllOk(rows, 'LLM confused arc');
-    }, 150000);
+    }, 120000);
 
     it('angry → calm → neutral (2 calm messages)', async () => {
         let state = createInitialMoodState();

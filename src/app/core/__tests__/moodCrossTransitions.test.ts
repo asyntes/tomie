@@ -44,7 +44,6 @@ describe('cross-mood transitions (simulated tags)', () => {
         let s = createInitialMoodState();
         s = commitTurn(s, 'romantic').newState;
         s = commitTurn(s, 'romantic').newState;
-        s = commitTurn(s, 'romantic').newState;
         expect(s.currentMood).toBe('romantic');
 
         s = commitTurn(s, 'angry').newState;
@@ -56,11 +55,10 @@ describe('cross-mood transitions (simulated tags)', () => {
         expect(s.currentMood).toBe('angry');
     });
 
-    it('romantic approaching does not change currentMood until threshold', () => {
+    it('romantic reaches stable after two romantic tags', () => {
         let s = commitTurn(createInitialMoodState(), 'romantic').newState;
         expect(s.currentMood).toBe('neutral');
-        s = commitTurn(s, 'romantic').newState;
-        expect(s.currentMood).toBe('neutral');
+        expect(s.pendingMood).toBe('romantic');
         s = commitTurn(s, 'romantic').newState;
         expect(s.currentMood).toBe('romantic');
     });

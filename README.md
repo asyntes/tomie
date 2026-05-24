@@ -19,7 +19,7 @@ Interactive AI terminal interface built with Next.js and React. Tomie is a chara
 |------|-------|--------------------------------------|
 | **Neutral** | Blue | Normal chat, factual questions |
 | **Angry** | Red | Sustained hostility (2 tags) |
-| **Romantic** | Purple | Explicit flirt / love (3 tags; slowest to enter) |
+| **Romantic** | Purple | Explicit flirt / love (2 tags, same as other moods) |
 | **Excited** | Orange | Enthusiasm (2 tags) |
 | **Confused** | Green | Unclear or lost user (2 tags) |
 
@@ -35,16 +35,14 @@ flowchart TB
 
     neutral -->|"1st non-neutral MOOD tag"| approaching["Approaching<br/>pending mood, UI unchanged"]
 
-    approaching -->|"2 matching tags"| stable_fast["Stable angry, excited, or confused"]
-    approaching -->|"3 matching tags"| stable_romantic["Stable romantic"]
+    approaching -->|"2 matching tags"| stable_mood["Stable mood incl. romantic"]
     approaching -->|"MOOD neutral"| approaching
 
-    stable_fast -->|"1st MOOD neutral"| cooling["Cooling<br/>UI unchanged"]
-    stable_romantic -->|"1st MOOD neutral"| cooling
+    stable_mood -->|"1st MOOD neutral"| cooling["Cooling<br/>UI unchanged"]
 
     cooling -->|"2nd MOOD neutral"| neutral
 
-    stable_fast -.->|"cannot jump to another mood"| stable_fast
+    stable_mood -.->|"cannot jump to another mood"| stable_mood
 ```
 
 | Phase | Visual UI | Behavior |
@@ -58,14 +56,16 @@ flowchart TB
 
 | Direction | All moods (angry, romantic, excited, confused) |
 |-----------|--------------------------------------------------|
-| Enter (from neutral) | 2 tags (angry, excited, confused); **3 tags** for romantic |
+| Enter (from neutral) | **2** matching `[MOOD:]` tags (all moods including romantic) |
 | Exit (to neutral) | 2 consecutive `[MOOD:neutral]` tags |
 
-**Important:** Progress uses only `detectedMood` from the API (parsed from `[MOOD:…]` in Grok’s reply). If the UI stays on neutral, inspect the `/api/grok` response — the model may be tagging `[MOOD:neutral]` too often.
+**Important:** Progress uses the mood signal from Grok. Each reply includes a `[MOOD:…]` tag; if that tag is `[MOOD:neutral]`, a **second lightweight LLM call** classifies the user message (no regex in TypeScript). Both paths are prompt-driven.
+
+If the UI stays neutral, check `/api/grok` → `detectedMood` in DevTools.
 
 Mismatch handling: a `[MOOD:neutral]` tag while **approaching** freezes progress (no decay). From **stable** neutral, a mismatched tag decays approaching progress slowly.
 
-Hostile user text with a `[MOOD:neutral]` reply still counts toward **angry** when insult keywords are detected (`moodSignalResolver`).
+**Fixing wrong tags:** improve prompts in `src/app/services/ai/prompts/moodPersonalities.ts` (`MOOD_DETECTION_GUIDELINES`) and approaching blocks in `promptGenerator.ts` — not application code heuristics.
 
 ### Trying moods manually
 
@@ -73,10 +73,10 @@ After `/clear`, send **two messages in a row** with the same emotional tone. The
 
 | Target mood | Example inputs (×2) |
 |-------------|---------------------|
-| Excited | `WOW è INCREDIBILE!!!` |
-| Confused | `Non capisco cosa intendi` |
-| Romantic | 3 explicit flirt/love messages in a row |
-| Angry | Sustained hostility / insults |
+| Excited | `WOW!!! INCREDIBILE!!!` then `È FANTASTICO!!!` (×2) |
+| Confused | `Non capisco nulla` then `Sono perso, spiegati meglio` (×2) |
+| Romantic | 2 explicit messages (e.g. *Ti desidero…* then *Ti amo Tomie*) |
+| Angry | Two hostile messages (model must tag `[MOOD:angry]` each time) |
 
 ## Environment variables
 
@@ -148,8 +148,9 @@ TomieTerminal
   → responseHandler.generateFullResponse
       → moodStateMachine.previewTurn(state)     # pick responseMood for this turn
       → POST /api/grok                          # GrokService + PromptGenerator
-      → moodDetector.extractMoodFromResponse    # [MOOD:] → detectedMood
-      → moodStateMachine.commitTurn(state, tag) # update progress / transition
+      → moodDetector.extractMoodFromResponse    # [MOOD:] from reply
+      → moodClassifier (if neutral)             # second LLM call on user message
+      → moodStateMachine.commitTurn(state, tag)
   → UI: brief interference (~550ms) + setMoodState if shouldChangeMood
 ```
 
@@ -164,7 +165,8 @@ TomieTerminal
 | [`src/app/core/stateManager.ts`](src/app/core/stateManager.ts) | Initial state + thin wrapper over `commitTurn` |
 | [`src/app/services/ai/grokService.ts`](src/app/services/ai/grokService.ts) | xAI client, model from env |
 | [`src/app/services/ai/promptGenerator.ts`](src/app/services/ai/promptGenerator.ts) | System prompt: `responseMood`, approaching, tag rules |
-| [`src/app/services/ai/moodDetector.ts`](src/app/services/ai/moodDetector.ts) | Parse and strip `[MOOD:…]` |
+| [`src/app/services/ai/moodDetector.ts`](src/app/services/ai/moodDetector.ts) | Parse `[MOOD:…]` from character reply |
+| [`src/app/services/ai/moodClassifier.ts`](src/app/services/ai/moodClassifier.ts) | Fallback LLM classifier when reply tag is neutral |
 | [`src/app/services/ai/prompts/moodPersonalities.ts`](src/app/services/ai/prompts/moodPersonalities.ts) | Personalities + tag guidelines for the model |
 | [`src/app/components/TomieTerminal/TomieTerminal.tsx`](src/app/components/TomieTerminal/TomieTerminal.tsx) | UI, typing, mood visuals |
 
@@ -175,7 +177,7 @@ TomieTerminal
 | `src/app/core/__tests__/moodStateMachine.test.ts` | Unit — thresholds, approaching, decay |
 | `src/app/core/__tests__/moodTransitionScenarios.test.ts` | Unit — multi-turn tag sequences |
 | `src/app/services/ai/__tests__/moodDetector.test.ts` | Unit — tag parsing |
-| `src/app/evals/moodJudge.eval.ts` | Optional LLM judge |
+| `src/app/evals/moodTagging.eval.ts` | LLM — asserts final mood state per user message sequence |
 
 ## Commands
 
@@ -194,13 +196,18 @@ TomieTerminal
 - Vitest
 - Custom i18n (`src/app/i18n/`)
 
-## AI prompts
+## AI prompts (mood detection)
 
-- **Personalities** — Per-mood voice in `moodPersonalities.ts`
-- **Tag rules** — Mandatory `[MOOD:]` on every reply; guidelines + examples teach Grok when to use each tag (not runtime keyword matching)
-- **Language** — Replies match user language (IT/EN)
-- **Approaching** — Subtle tone shift + hint to keep tagging the pending mood when the user continues the same tone
-- **Tone vs tag** — Response text uses `responseMood`; the tag labels user input only
+All mood detection is **prompt-driven** (no regex on user input in TypeScript).
+
+| Layer | File | Role |
+|-------|------|------|
+| Reply tag | `moodDetector.ts` | Parse `[MOOD:…]` from character reply |
+| Fallback classifier | `moodClassifier.ts` + `grokService.classifyUserMood` | If reply tag is neutral, one-word LLM classification of user message |
+| Tag taxonomy | `moodPersonalities.ts` → `MOOD_DETECTION_GUIDELINES` | Instructs reply tagging |
+| Per-turn context | `promptGenerator.ts` | User message + approaching rules |
+
+Run `RUN_LLM_EVALS=1 npm run test:tags` to verify angry / excited / confused / romantic reach the expected UI state (checks **state machine + tags**, not LLM-as-judge on tone).
 
 ## Project structure (summary)
 

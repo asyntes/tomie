@@ -9,6 +9,7 @@ import {
 } from '../core/moodStateMachine';
 import { normalizeMoodState } from '../core/normalizeMoodState';
 import { ConversationMessage } from '../types/ai';
+import { computeResponseMood } from '../core/turnPlanner';
 
 export interface TomieTurnResult {
     responseText: string;
@@ -56,47 +57,30 @@ export async function runTomieTurn(
 ): Promise<TomieTurnResult> {
     const state = normalizeMoodState(moodState);
     const grok = GrokService.createFromEnv();
-    const isApproaching = state.phase === 'approaching' || state.phase === 'cooling';
 
-    const buildPayload = (s: MoodState, mood: Mood, approaching: boolean) => ({
+    const classifiedMood = await grok.classifyUserMood(userInput);
+    const commit = commitTurn(state, classifiedMood);
+    const responseMood = computeResponseMood(commit);
+    const s = commit.newState;
+    const isApproaching = s.phase === 'approaching' || s.phase === 'cooling';
+
+    const apiResponse = await grok.generateResponse({
         prompt: userInput,
         currentMood: s.currentMood,
-        responseMood: mood,
-        isApproaching: approaching,
+        responseMood,
+        isApproaching,
         pendingMood: s.pendingMood,
         approachProgress: s.progressScore,
         approachThreshold: getApproachThresholdForState(s),
         approachLabel: getApproachLabel(s),
+        resolvedUserMood: classifiedMood,
         messages,
     });
 
-    const first = await grok.generateResponse({
-        ...buildPayload(state, state.currentMood, isApproaching),
-    });
-
-    const commit = commitTurn(state, first.detectedMood, userInput);
-    let responseText = first.response;
-    let detectedMood = first.detectedMood;
-
-    if (commit.shouldChangeMood && commit.transitionTarget) {
-        const settled = await grok.generateResponse({
-            ...buildPayload(commit.newState, commit.transitionTarget, false),
-            currentMood: commit.transitionTarget,
-            responseMood: commit.transitionTarget,
-            isApproaching: false,
-            pendingMood: undefined,
-            approachProgress: 0,
-            approachThreshold: undefined,
-            approachLabel: undefined,
-        });
-        responseText = settled.response;
-        detectedMood = settled.detectedMood;
-    }
-
     return {
-        responseText,
-        detectedMood,
-        responseMood: commit.newState.currentMood,
+        responseText: apiResponse.response,
+        detectedMood: classifiedMood,
+        responseMood,
         newState: commit.newState,
         shouldChangeMood: commit.shouldChangeMood,
         userInput,
@@ -112,7 +96,7 @@ export function runSimulatedScript(steps: SimulatedStep[]): {
 
     steps.forEach((step, index) => {
         const before = snapshot(state);
-        const commit = commitTurn(state, step.modelTag, step.userInput);
+        const commit = commitTurn(state, step.modelTag);
         state = commit.newState;
         log.push({
             step: index + 1,
@@ -232,7 +216,7 @@ export function runTracedSimulated(
     const rows: TransitionTraceRow[] = [];
 
     steps.forEach((step, index) => {
-        const commit = commitTurn(state, step.modelTag, step.userInput);
+        const commit = commitTurn(state, step.modelTag);
         state = commit.newState;
         const row: TransitionTraceRow = {
             step: index + 1,

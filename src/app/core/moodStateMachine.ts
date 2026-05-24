@@ -3,7 +3,7 @@ import { MoodState } from '../types/mood';
 import { resolveMoodSignal } from './moodSignalResolver';
 
 export const MOOD_TRANSITION_CONFIG = {
-    enterFromNeutral: { angry: 2, romantic: 3, excited: 2, confused: 2 } as Record<Mood, number>,
+    enterFromNeutral: { angry: 2, romantic: 2, excited: 2, confused: 2 } as Record<Mood, number>,
     exitToNeutral: { angry: 2, romantic: 2, excited: 2, confused: 2 } as Record<Mood, number>,
     decayOnMismatch: 1,
 };
@@ -282,8 +282,8 @@ function applyTurn(state: MoodState, signal: MoodSignal): TurnCommitResult {
     };
 }
 
-export function buildMoodSignal(modelTag: Mood, userInput?: string): MoodSignal {
-    return resolveMoodSignal(modelTag, userInput);
+export function buildMoodSignal(modelTag: Mood): MoodSignal {
+    return resolveMoodSignal(modelTag);
 }
 
 export function previewTurn(state: MoodState): TurnPreview {
@@ -327,8 +327,8 @@ export function previewTurn(state: MoodState): TurnPreview {
     };
 }
 
-export function commitTurn(state: MoodState, modelTag: Mood, userInput?: string): TurnCommitResult {
-    const signal = buildMoodSignal(modelTag, userInput);
+export function commitTurn(state: MoodState, modelTag: Mood): TurnCommitResult {
+    const signal = buildMoodSignal(modelTag);
     return applyTurn(state, signal);
 }
 
