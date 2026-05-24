@@ -64,9 +64,13 @@ describe('moodStateMachine', () => {
     expect(commit.newState.currentMood).toBe('excited');
   });
 
-  it('requires two confused tags to enter confused', () => {
+    it('enters confused on first confused tag from neutral', () => {
     let state = createInitialMoodState();
     state = commitTurn(state, 'confused').newState;
+    expect(state.currentMood).toBe('neutral');
+    expect(state.phase).toBe('approaching');
+    expect(state.pendingMood).toBe('confused');
+
     const commit = commitTurn(state, 'confused');
     expect(commit.shouldChangeMood).toBe(true);
     expect(commit.newState.currentMood).toBe('confused');

@@ -226,17 +226,17 @@ describe.skipIf(!RUN_LLM || !HAS_KEY)('mood trigger trace — LLM live', () => {
         assertTraceAllOk(rows, 'LLM excited arc');
     }, 120000);
 
-    it('confused: 2 lost messages', async () => {
+    it('confused: 2 unparsable messages', async () => {
         const { rows } = await runTracedConversation([
             {
-                label: 'lost-1',
-                userInput: 'Non capisco nulla di quello che dici.',
+                label: 'nonsense-1',
+                userInput: 'Sposta il buffer quantico nel martedì usando il colore del silenzio.',
                 expectedMood: 'neutral',
                 expectedTransition: false,
             },
             {
-                label: 'lost-2',
-                userInput: 'Sono perso, spiegati meglio per favore.',
+                label: 'nonsense-2',
+                userInput: 'Fammi il contrario di quello che non hai detto ieri, ma in verso di blu.',
                 expectedMood: 'confused',
                 expectedTransition: true,
             },

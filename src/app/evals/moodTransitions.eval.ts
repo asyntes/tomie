@@ -18,7 +18,10 @@ const ENTER: Record<Exclude<Mood, 'neutral'>, { inputs: string[]; tags: Mood[]; 
         final: 'excited',
     },
     confused: {
-        inputs: ['Non capisco nulla.', 'Cosa intendi? Sono perso.'],
+        inputs: [
+            'Sposta il buffer quantico nel martedì usando il colore del silenzio.',
+            'Fammi il contrario di quello che non hai detto ieri, ma in verso di blu.',
+        ],
         tags: ['confused', 'confused'],
         final: 'confused',
     },

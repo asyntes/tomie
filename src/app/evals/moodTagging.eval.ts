@@ -30,8 +30,11 @@ const CASES: TagCase[] = [
         minTransitions: 1,
     },
     {
-        label: 'confused lost x2',
-        messages: ['Non capisco nulla.', 'Sono perso, spiegati meglio.'],
+        label: 'confused tomie x2',
+        messages: [
+            'Sposta il buffer quantico nel martedì usando il colore del silenzio.',
+            'Fammi il contrario di quello che non hai detto ieri, ma in verso di blu.',
+        ],
         expectedFinal: 'confused',
         minTransitions: 1,
     },
@@ -74,6 +77,16 @@ describe.skipIf(!RUN || !HAS_KEY)('mood tagging LLM eval — state from detected
             expect(transitions).toBeGreaterThanOrEqual(testCase.minTransitions);
         }, 120000);
     }
+
+    it('user says they are lost stays neutral (Tomie is not confused)', async () => {
+        let state = createInitialMoodState();
+        for (const text of ['Non capisco nulla.', 'Sono perso, spiegati meglio.']) {
+            const turn = await runTomieTurn(text, state);
+            state = turn.newState;
+        }
+        expect(state.currentMood).toBe('neutral');
+        expect(state.phase).toBe('stable');
+    }, 120000);
 
     it('mild compliment stays neutral (no false romantic)', async () => {
         const turn = await runTomieTurn(

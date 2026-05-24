@@ -10,6 +10,8 @@ export const MOOD_TRANSITION_CONFIG = {
 
 const NON_NEUTRAL_MOODS: Mood[] = ['angry', 'romantic', 'excited', 'confused'];
 
+const CROSS_MOOD_OVERRIDE: Mood[] = ['angry', 'confused'];
+
 export interface MoodSignal {
     mood: Mood;
     agreed: boolean;
@@ -196,11 +198,11 @@ function applyExitToNeutral(
 
     const isDeescalation = signal.mood === 'neutral';
     if (!isDeescalation && signal.mood !== current) {
-        if (signal.mood === 'angry') {
-            const alreadyApproachingAngry =
-                state.phase === 'approaching' && state.pendingMood === 'angry';
+        if (CROSS_MOOD_OVERRIDE.includes(signal.mood)) {
+            const alreadyApproachingTarget =
+                state.phase === 'approaching' && state.pendingMood === signal.mood;
             return applyEnterFromNeutral(
-                alreadyApproachingAngry
+                alreadyApproachingTarget
                     ? state
                     : {
                           ...state,
