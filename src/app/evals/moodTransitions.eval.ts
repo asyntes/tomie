@@ -1,13 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { Mood } from '../types/mood';
 import { createInitialMoodState } from '../core/moodStateMachine';
-import {
-    runLlmScript,
-    runSimulatedScript,
-    runTomieTurn,
-    formatState,
-} from './evalHelpers';
-import { judgeWithLlm, loadEnvLocal } from './evalJudge';
+import { runLlmScript, runSimulatedScript, runTomieTurn } from './evalHelpers';
+import { loadEnvLocal } from './evalJudge';
 
 const RUN = process.env.RUN_LLM_EVALS === '1';
 
