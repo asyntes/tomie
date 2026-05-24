@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { Mood } from '../types/mood';
 import { createInitialMoodState } from '../core/moodStateMachine';
 import { loadEnvLocal } from './evalJudge';
 

@@ -37,7 +37,7 @@ describe('moodStateMachine', () => {
   });
 
   it('transitions to angry on second insult with neutral model tag', () => {
-    let state = commitTurn(createInitialMoodState(), 'neutral', 'vaffanculo').newState;
+    const state = commitTurn(createInitialMoodState(), 'neutral', 'vaffanculo').newState;
     const commit = commitTurn(state, 'neutral', 'fottiti');
     expect(commit.shouldChangeMood).toBe(true);
     expect(commit.newState.currentMood).toBe('angry');
