@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:transitions": "vitest run src/app/core/__tests__/moodCrossTransitions.test.ts",
     "test:eval": "vitest run --config vitest.eval.config.ts",
-    "test:trace": "vitest run --config vitest.eval.config.ts src/app/evals/moodTriggerTrace.eval.ts"
+    "test:trace": "vitest run --config vitest.eval.config.ts src/app/evals/moodTriggerTrace.eval.ts",
+    "test:tags": "vitest run --config vitest.eval.config.ts src/app/evals/moodTagging.eval.ts"
   },
   "dependencies": {
     "next": "15.4.8",

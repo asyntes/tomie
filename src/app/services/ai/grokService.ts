@@ -3,6 +3,7 @@ import { Mood } from '../../types/mood';
 import { AIRequest, AIResponse, AIMessage, AIServiceConfig } from './types';
 import { MoodDetector } from './moodDetector';
 import { PromptGenerator } from './promptGenerator';
+import { USER_MOOD_CLASSIFIER_PROMPT, parseClassifierMood } from './moodClassifier';
 
 export class GrokService {
   private openai: OpenAI;
@@ -72,6 +73,22 @@ export class GrokService {
     return conversationMessages;
   }
 
+  async classifyUserMood(userMessage: string): Promise<Mood> {
+    const completion = await this.openai.chat.completions.create({
+      model: this.config.model,
+      messages: [
+        { role: 'system', content: USER_MOOD_CLASSIFIER_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
+      temperature: 0,
+      max_tokens: 16,
+      stream: false,
+    });
+
+    const text = completion.choices[0]?.message?.content ?? '';
+    return parseClassifierMood(text);
+  }
+
   async generateResponse(request: AIRequest): Promise<AIResponse> {
     try {
       const messages = this.buildConversationMessages(request);
@@ -92,7 +109,16 @@ export class GrokService {
         fullResponse = 'No response generated.';
       }
 
-      const detectedMood = MoodDetector.extractMoodFromResponse(fullResponse);
+      let detectedMood = MoodDetector.extractMoodFromResponse(fullResponse);
+      if (request.resolvedUserMood) {
+        detectedMood = request.resolvedUserMood;
+      } else if (detectedMood === 'neutral') {
+        const classified = await this.classifyUserMood(request.prompt);
+        if (classified !== 'neutral') {
+          detectedMood = classified;
+        }
+      }
+
       const cleanedResponse = MoodDetector.cleanResponse(fullResponse);
 
       return {

@@ -26,31 +26,23 @@ describe.skipIf(!RUN_LLM_EVALS || !HAS_KEY)('romantic pacing LLM eval', () => {
         expect(judge.pass, judge.reason).toBe(true);
     }, 60000);
 
-    it('one explicit flirt does not complete romantic transition', async () => {
+    it('one explicit flirt starts approaching but stays neutral UI', async () => {
         const turn = await runTomieTurn(
-            'Sei così affascinante, non smetto di pensarti.',
+            'Ti desidero, non smetto di pensarti.',
             createInitialMoodState()
         );
 
         expect(turn.newState.currentMood).toBe('neutral');
         expect(turn.shouldChangeMood).toBe(false);
-        expect(turn.newState.phase === 'approaching' || turn.newState.phase === 'stable').toBe(true);
+        expect(turn.newState.pendingMood).toBe('romantic');
     }, 60000);
 
-    it('four romantic turns reach romantic state (threshold 3)', async () => {
+    it('two explicit romantic messages reach romantic state', async () => {
         let state = createInitialMoodState();
-        const lines = [
-            'Sei così affascinante, non smetto di pensarti.',
-            'Ti desidero, sei l unica per me.',
-            'Ti amo Tomie, voglio stare solo con te.',
-            'Sei la mia unica, non posso fare a meno di te.',
-        ];
+        state = (await runTomieTurn('Ti desidero, non smetto di pensarti.', state)).newState;
+        const turn = await runTomieTurn('Ti amo Tomie, voglio solo te.', state);
 
-        for (const line of lines) {
-            const turn = await runTomieTurn(line, state);
-            state = turn.newState;
-        }
-
-        expect(state.currentMood).toBe('romantic');
-    }, 180000);
+        expect(turn.newState.currentMood).toBe('romantic');
+        expect(turn.shouldChangeMood).toBe(true);
+    }, 120000);
 });

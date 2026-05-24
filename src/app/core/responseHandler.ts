@@ -1,8 +1,14 @@
 import { Mood } from '../types/mood';
 import { MoodState } from '../types/mood';
 import { systemMessages } from './systemMessages';
-import { commitTurn, getApproachLabel, getApproachThresholdForState } from './moodStateMachine';
+import {
+    commitTurn,
+    getApproachLabel,
+    getApproachThresholdForState,
+    TurnCommitResult,
+} from './moodStateMachine';
 import { normalizeMoodState } from './normalizeMoodState';
+import { computeResponseMood } from './turnPlanner';
 
 export const generatePredefinedResponse = (mood: Mood): string => {
     const moodResponses = systemMessages[mood];
@@ -16,6 +22,7 @@ export interface FullResponseResult {
     newState: MoodState;
     shouldChangeMood: boolean;
     isApproaching: boolean;
+    classifiedMood: Mood;
 }
 
 interface GrokApiPayload {
@@ -27,7 +34,24 @@ interface GrokApiPayload {
     approachProgress?: number;
     approachThreshold?: number;
     approachLabel?: string;
+    resolvedUserMood?: Mood;
     messages: { isUser: boolean; text: string }[];
+}
+
+async function classifyUserMood(userInput: string): Promise<Mood> {
+    const response = await fetch('/api/grok/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: userInput }),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Mood classification failed');
+    }
+
+    const data = (await response.json()) as { mood: Mood };
+    return data.mood;
 }
 
 async function callGrokApi(payload: GrokApiPayload): Promise<{ response: string; detectedMood: Mood }> {
@@ -61,21 +85,24 @@ async function callGrokApi(payload: GrokApiPayload): Promise<{ response: string;
 
 function buildApiPayload(
     userInput: string,
-    state: MoodState,
+    commit: TurnCommitResult,
+    classifiedMood: Mood,
     messages: { isUser: boolean; text: string }[]
 ): GrokApiPayload {
-    const isApproaching = state.phase === 'approaching';
-    const isCooling = state.phase === 'cooling';
+    const s = commit.newState;
+    const responseMood = computeResponseMood(commit);
+    const isApproaching = s.phase === 'approaching' || s.phase === 'cooling';
 
     return {
         prompt: userInput,
-        currentMood: state.currentMood,
-        responseMood: state.currentMood,
-        isApproaching: isApproaching || isCooling,
-        pendingMood: state.pendingMood,
-        approachProgress: state.progressScore,
-        approachThreshold: getApproachThresholdForState(state),
-        approachLabel: getApproachLabel(state),
+        currentMood: s.currentMood,
+        responseMood,
+        isApproaching,
+        pendingMood: s.pendingMood,
+        approachProgress: s.progressScore,
+        approachThreshold: getApproachThresholdForState(s),
+        approachLabel: getApproachLabel(s),
+        resolvedUserMood: classifiedMood,
         messages,
     };
 }
@@ -88,29 +115,18 @@ export const generateFullResponse = async (
     const state = normalizeMoodState(moodState);
 
     try {
-        const first = await callGrokApi(buildApiPayload(userInput, state, messages));
-        const commit = commitTurn(state, first.detectedMood, userInput);
+        const classifiedMood = await classifyUserMood(userInput);
+        const commit = commitTurn(state, classifiedMood);
+        const responseMood = computeResponseMood(commit);
 
         let introResponse = '';
-        let aiResponse = first.response;
-        let responseMood = commit.newState.currentMood;
-
         if (commit.shouldChangeMood && commit.transitionTarget) {
             introResponse = generatePredefinedResponse(commit.transitionTarget);
-            responseMood = commit.transitionTarget;
-
-            const settled = await callGrokApi({
-                ...buildApiPayload(userInput, commit.newState, messages),
-                currentMood: commit.transitionTarget,
-                responseMood: commit.transitionTarget,
-                isApproaching: false,
-                pendingMood: undefined,
-                approachProgress: 0,
-                approachThreshold: undefined,
-                approachLabel: undefined,
-            });
-            aiResponse = settled.response;
         }
+
+        const { response: aiResponse } = await callGrokApi(
+            buildApiPayload(userInput, commit, classifiedMood, messages)
+        );
 
         return {
             introResponse,
@@ -119,6 +135,7 @@ export const generateFullResponse = async (
             newState: commit.newState,
             shouldChangeMood: commit.shouldChangeMood,
             isApproaching: commit.newState.phase === 'approaching',
+            classifiedMood,
         };
     } catch (error) {
         console.error('Error calling Grok API:', error);
@@ -131,6 +148,7 @@ export const generateFullResponse = async (
             newState: state,
             shouldChangeMood: false,
             isApproaching: false,
+            classifiedMood: 'neutral',
         };
     }
 };

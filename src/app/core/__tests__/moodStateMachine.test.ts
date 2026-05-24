@@ -28,19 +28,11 @@ describe('moodStateMachine', () => {
     expect(commit.newState.currentMood).toBe('angry');
   });
 
-  it('starts approaching angry on insult when model tags neutral', () => {
-    const commit = commitTurn(createInitialMoodState(), 'neutral', 'vaffanculo');
+  it('does not progress toward angry when model tags neutral', () => {
+    const commit = commitTurn(createInitialMoodState(), 'neutral');
     expect(commit.shouldChangeMood).toBe(false);
-    expect(commit.newState.currentMood).toBe('neutral');
-    expect(commit.newState.phase).toBe('approaching');
-    expect(commit.newState.pendingMood).toBe('angry');
-  });
-
-  it('transitions to angry on second insult with neutral model tag', () => {
-    const state = commitTurn(createInitialMoodState(), 'neutral', 'vaffanculo').newState;
-    const commit = commitTurn(state, 'neutral', 'fottiti');
-    expect(commit.shouldChangeMood).toBe(true);
-    expect(commit.newState.currentMood).toBe('angry');
+    expect(commit.newState.phase).toBe('stable');
+    expect(commit.newState.pendingMood).toBeUndefined();
   });
 
   it('holds romantic approaching progress when model returns neutral', () => {
@@ -55,15 +47,29 @@ describe('moodStateMachine', () => {
     expect(commit.newState.pendingMood).toBe('romantic');
   });
 
-  it('requires three romantic tags to enter romantic', () => {
+  it('requires two romantic tags to enter romantic', () => {
     let state = createInitialMoodState();
-    state = commitTurn(state, 'romantic').newState;
-    expect(state.currentMood).toBe('neutral');
     state = commitTurn(state, 'romantic').newState;
     expect(state.currentMood).toBe('neutral');
     const commit = commitTurn(state, 'romantic');
     expect(commit.shouldChangeMood).toBe(true);
     expect(commit.newState.currentMood).toBe('romantic');
+  });
+
+  it('requires two excited tags to enter excited', () => {
+    let state = createInitialMoodState();
+    state = commitTurn(state, 'excited').newState;
+    const commit = commitTurn(state, 'excited');
+    expect(commit.shouldChangeMood).toBe(true);
+    expect(commit.newState.currentMood).toBe('excited');
+  });
+
+  it('requires two confused tags to enter confused', () => {
+    let state = createInitialMoodState();
+    state = commitTurn(state, 'confused').newState;
+    const commit = commitTurn(state, 'confused');
+    expect(commit.shouldChangeMood).toBe(true);
+    expect(commit.newState.currentMood).toBe('confused');
   });
 
   it('exits angry to neutral after two model neutral tags', () => {

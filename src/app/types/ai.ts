@@ -21,6 +21,7 @@ export interface AIRequest {
   approachThreshold?: number;
   approachLabel?: string;
   messages?: ConversationMessage[];
+  resolvedUserMood?: Mood;
 }
 
 export interface AIResponse {

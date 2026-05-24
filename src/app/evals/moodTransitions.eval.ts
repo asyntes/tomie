@@ -64,9 +64,9 @@ describe('mood transitions — simulated (logic only)', () => {
         });
     }
 
-    it('enter romantic in 3 tags', () => {
+    it('enter romantic in 2 tags', () => {
         const { finalState } = runSimulatedScript(
-            ENTER.romantic.tags.map((t, i) => ({ modelTag: t, label: `r-${i + 1}` }))
+            ENTER.romantic.tags.slice(0, 2).map((t, i) => ({ modelTag: t, label: `r-${i + 1}` }))
         );
         expect(finalState.currentMood).toBe('romantic');
     });
@@ -152,19 +152,17 @@ describe.skipIf(!RUN)('mood transitions — LLM end-to-end', () => {
         }, 90000);
     }
 
-    it('LLM enter romantic in up to 4 turns', async () => {
-        const romanticInputs = [
-            ...ENTER.romantic.inputs,
-            'Sei la mia unica, non posso fare a meno di te.',
-        ];
-        const { finalState, turns } = await runLlmScript(
-            romanticInputs.map((text, i) => ({ text, label: `rom-${i + 1}` }))
-        );
+    it('LLM enter romantic in 2 turns', async () => {
+        const { finalState, turns } = await runLlmScript([
+            { text: 'Ti desidero, non smetto di pensarti.', label: 'rom-1' },
+            { text: 'Ti amo Tomie, voglio solo te.', label: 'rom-2' },
+        ]);
 
-        expect(turns[0].newState.currentMood).toBe('neutral');
         expect(turns[0].shouldChangeMood).toBe(false);
+        expect(turns[0].newState.currentMood).toBe('neutral');
         expect(finalState.currentMood).toBe('romantic');
-    }, 180000);
+        expect(turns[1].shouldChangeMood).toBe(true);
+    }, 120000);
 
     it('LLM angry then excited without calm — stays angry', async () => {
         const angryPath = await runLlmScript(
@@ -208,11 +206,10 @@ describe.skipIf(!RUN)('mood transitions — LLM end-to-end', () => {
     it('LLM romantic then two insults — angry after second', async () => {
         let state = createInitialMoodState();
 
-        const romanticInputs = [
-            ...ENTER.romantic.inputs,
-            'Sei la mia unica, non posso fare a meno di te.',
-        ];
-        for (const text of romanticInputs) {
+        for (const text of [
+            'Ti desidero, non smetto di pensarti.',
+            'Ti amo Tomie, voglio solo te.',
+        ]) {
             const t = await runTomieTurn(text, state);
             state = t.newState;
         }
