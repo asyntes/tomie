@@ -30,13 +30,21 @@ Each mood has unique colors, SVG eyes, and prompt personality definitions in `sr
 Logic lives in [`src/app/core/moodStateMachine.ts`](src/app/core/moodStateMachine.ts). Configuration: `MOOD_TRANSITION_CONFIG`.
 
 ```mermaid
-stateDiagram-v2
-    [*] --> neutral
-    neutral --> approaching: first non-neutral [MOOD:] tag
-    approaching --> angry: threshold reached (2x hostile tags; romantic 3x)
-    approaching --> neutral: neutral tag decays progress
-    angry --> cooling: first [MOOD:neutral]
-    cooling --> neutral: exit threshold reached
+flowchart TB
+    start(["/clear or new chat"]) --> neutral
+
+    neutral -->|"1st non-neutral MOOD tag"| approaching["Approaching<br/>pending mood, UI unchanged"]
+
+    approaching -->|"2 matching tags"| stable_fast["Stable angry, excited, or confused"]
+    approaching -->|"3 matching tags"| stable_romantic["Stable romantic"]
+    approaching -->|"MOOD neutral"| approaching
+
+    stable_fast -->|"1st MOOD neutral"| cooling["Cooling<br/>UI unchanged"]
+    stable_romantic -->|"1st MOOD neutral"| cooling
+
+    cooling -->|"2nd MOOD neutral"| neutral
+
+    stable_fast -.->|"cannot jump to another mood"| stable_fast
 ```
 
 | Phase | Visual UI | Behavior |
@@ -55,7 +63,9 @@ stateDiagram-v2
 
 **Important:** Progress uses only `detectedMood` from the API (parsed from `[MOOD:…]` in Grok’s reply). If the UI stays on neutral, inspect the `/api/grok` response — the model may be tagging `[MOOD:neutral]` too often.
 
-Mismatch handling: a `[MOOD:neutral]` tag while approaching decays progress gradually (no hard reset).
+Mismatch handling: a `[MOOD:neutral]` tag while **approaching** freezes progress (no decay). From **stable** neutral, a mismatched tag decays approaching progress slowly.
+
+Hostile user text with a `[MOOD:neutral]` reply still counts toward **angry** when insult keywords are detected (`moodSignalResolver`).
 
 ### Trying moods manually
 
@@ -117,6 +127,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `npm run lint` | ESLint |
 | `npm test` | Vitest — state machine, mood tag parser, scenarios |
 | `npm run test:eval` | Optional LLM-as-judge evals (see below) |
+| `npm run test:trace` | Mood transition trace evals (simulated + optional LLM) |
 
 ### Optional LLM evals
 
