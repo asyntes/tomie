@@ -45,8 +45,8 @@ If the user keeps celebrating, using WOW, exclamation marks, or sharing exciting
   }
 
   if (pendingMood === 'confused') {
-    return `${trajectory}: Stay in ${currentMood.toUpperCase()} tone — not full confusion yet. Stay mostly clear in your reply.
-If the user still says they do not understand, are lost, or asks what you mean, you MUST tag [MOOD:confused].`;
+    return `${trajectory}: Stay in ${currentMood.toUpperCase()} tone — Tomie is not fully puzzled yet. Stay mostly clear in your reply.
+If the user sends another nonsensical, absurd, contradictory, or unparsable message (Tomie cannot tell what they want), you MUST tag [MOOD:confused]. User saying "non capisco" or asking for clarification → [MOOD:neutral].`;
   }
 
   return `${trajectory}: Stay in ${currentMood.toUpperCase()} tone. If the user keeps the same ${pendingMood} tone, tag [MOOD:${pendingMood}].`;
@@ -58,7 +58,7 @@ function buildUserTaggingBlock(userMessage: string, pendingMood?: Mood): string 
     '=== CLASSIFY THIS USER MESSAGE (for [MOOD:] tag only) ===',
     `"${userMessage}"`,
     'Pick the tag that matches the USER message tone (see Mood Detection guidelines).',
-    'Wrong [MOOD:neutral] when the user is hostile, flirting, hyped, or confused blocks the mood UI.',
+    'Wrong [MOOD:neutral] when the user is hostile, flirting, hyped, or sends something Tomie cannot parse blocks the mood UI.',
   ];
 
   if (pendingMood) {

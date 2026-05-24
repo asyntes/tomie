@@ -62,4 +62,18 @@ describe('cross-mood transitions (simulated tags)', () => {
         s = commitTurn(s, 'romantic').newState;
         expect(s.currentMood).toBe('romantic');
     });
+
+    it('romantic stable plus two confusing tags switches to confused', () => {
+        let s = createInitialMoodState();
+        s = commitTurn(s, 'romantic').newState;
+        s = commitTurn(s, 'romantic').newState;
+        expect(s.currentMood).toBe('romantic');
+
+        s = commitTurn(s, 'confused').newState;
+        expect(s.currentMood).toBe('romantic');
+        expect(s.pendingMood).toBe('confused');
+
+        s = commitTurn(s, 'confused').newState;
+        expect(s.currentMood).toBe('confused');
+    });
 });

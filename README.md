@@ -21,7 +21,7 @@ Interactive AI terminal interface built with Next.js and React. Tomie is a chara
 | **Angry** | Red | Sustained hostility (2 tags) |
 | **Romantic** | Purple | Explicit flirt / love (2 tags, same as other moods) |
 | **Excited** | Orange | Enthusiasm (2 tags) |
-| **Confused** | Green | Unclear or lost user (2 tags) |
+| **Confused** | Green | Tomie cannot parse the user message — nonsense, absurd, unparsable (2 tags) |
 
 Each mood has unique colors, SVG eyes, and prompt personality definitions in `src/app/services/ai/prompts/`.
 
@@ -74,7 +74,7 @@ After `/clear`, send **two messages in a row** with the same emotional tone. The
 | Target mood | Example inputs (×2) |
 |-------------|---------------------|
 | Excited | `WOW!!! INCREDIBILE!!!` then `È FANTASTICO!!!` (×2) |
-| Confused | `Non capisco nulla` then `Sono perso, spiegati meglio` (×2) |
+| Confused | Two absurd/unparsable messages, e.g. nonsense requests Tomie cannot interpret (×2) |
 | Romantic | 2 explicit messages (e.g. *Ti desidero…* then *Ti amo Tomie*) |
 | Angry | Two hostile messages (model must tag `[MOOD:angry]` each time) |
 
