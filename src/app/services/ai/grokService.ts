@@ -32,7 +32,7 @@ export class GrokService {
       model,
       temperature: 0,
       top_p: 0.95,
-      max_tokens: 2048,
+      max_tokens: 1024,  // Reduced to help with token rate limits (TPM)
     });
   }
 
@@ -74,19 +74,25 @@ export class GrokService {
   }
 
   async classifyUserMood(userMessage: string): Promise<Mood> {
-    const completion = await this.openai.chat.completions.create({
-      model: this.config.model,
-      messages: [
-        { role: 'system', content: USER_MOOD_CLASSIFIER_PROMPT },
-        { role: 'user', content: userMessage },
-      ],
-      temperature: 0,
-      max_tokens: 16,
-      stream: false,
-    });
+    try {
+      const completion = await this.openai.chat.completions.create({
+        model: this.config.model,
+        messages: [
+          { role: 'system', content: USER_MOOD_CLASSIFIER_PROMPT },
+          { role: 'user', content: userMessage },
+        ],
+        temperature: 0,
+        max_tokens: 16,
+        stream: false,
+      });
 
-    const text = completion.choices[0]?.message?.content ?? '';
-    return parseClassifierMood(text);
+      const text = completion.choices[0]?.message?.content ?? '';
+      return parseClassifierMood(text);
+    } catch (error) {
+      console.error('Error in classifyUserMood:', error);
+      const message = GrokService.formatApiError(error);
+      throw new Error(message);
+    }
   }
 
   async generateResponse(request: AIRequest): Promise<AIResponse> {
@@ -133,19 +139,42 @@ export class GrokService {
   }
 
   private static formatApiError(error: unknown): string {
+    // Log full details server-side only
+    console.error('Detailed Grok API error for debugging:', error);
+
     if (error && typeof error === 'object' && 'status' in error) {
       const apiError = error as { status?: number; message?: string; error?: { message?: string } };
-      const detail = apiError.error?.message ?? apiError.message;
+      const detail = apiError.error?.message ?? apiError.message ?? '';
+
+      // Specific handling for rate limit / token quota errors - show themed generic message
+      if (
+        apiError.status === 429 ||
+        detail.includes('Too many tokens') ||
+        detail.toLowerCase().includes('rate limit') ||
+        detail.includes('tokens per minute') ||
+        detail.includes('429')
+      ) {
+        return 'Ops... Tomie si sente un po\' sovraccarica con tutti questi pensieri! \uD83D\uDC99 Dammi un momento per ricaricarmi le batterie e riprova tra poco, okay?';
+      }
+
       if (apiError.status === 404 && detail) {
         return `Model unavailable: ${detail}. Set XAI_MODEL in .env.local to a model enabled for your key (see console.x.ai).`;
       }
+
       if (detail) {
-        return `Grok API error: ${detail}`;
+        // Generic for other API errors
+        return 'Tomie ha avuto un piccolo intoppo tecnico. Riprova tra poco! \uD83D\uDC99';
       }
     }
+
     if (error instanceof Error && error.message) {
-      return error.message;
+      if (error.message.includes('API key not configured') || error.message.includes('XAI_API_KEY')) {
+        return 'API key not configured';
+      }
+      // Generic for other errors
+      return 'Tomie ha avuto un piccolo intoppo. Riprova tra poco! \uD83D\uDC99';
     }
-    return 'Failed to generate response';
+
+    return 'Tomie ha avuto un problema. Riprova tra poco! \uD83D\uDC99';
   }
 }
