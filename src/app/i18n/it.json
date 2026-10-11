@@ -31,9 +31,9 @@
     "title": "INFORMATIVA SULLA PRIVACY",
     "dataProcessing": "Avviso di Elaborazione Dati:",
     "bulletPoints": [
-      "I tuoi messaggi vengono inviati a xAI (Grok API) per la generazione di risposte AI",
+      "I tuoi messaggi vengono inviati a SpaceX Superintelligence (Grok API) per la generazione di risposte AI",
       "I messaggi vengono anche elaborati sull'infrastruttura Vercel per l'hosting dell'applicazione",
-      "xAI e Vercel potrebbero tracciare il tuo indirizzo IP a scopo statistico, ma questi dati non vengono collegati alle tue conversazioni",
+      "SpaceX Superintelligence e Vercel potrebbero tracciare il tuo indirizzo IP a scopo statistico, ma questi dati non vengono collegati alle tue conversazioni",
       "Nessun dato di conversazione viene memorizzato o registrato permanentemente da questa applicazione",
       "La trasmissione dei dati avviene solo per la generazione di risposte in tempo reale",
       "Non vengono raccolte informazioni personali oltre ai messaggi che scegli di inviare"
@@ -49,13 +49,13 @@
     ],
     "thirdPartyTitle": "Servizi di Terze Parti:",
     "thirdPartyPoints": [
-      "xAI: Elabora i tuoi messaggi tramite il loro modello Grok-3-Mini",
+      "SpaceX Superintelligence: Elabora i tuoi messaggi tramite il loro modello Grok-3-Mini",
       "Vercel: Ospita l'applicazione e gestisce il routing API"
     ],
     "retention": "I tuoi messaggi vengono elaborati in tempo reale e non vengono conservati dopo la fine della sessione.",
     "questions": "Per domande sulla gestione dei dati, fai riferimento a:",
     "links": [
-      "Informativa Privacy xAI: https://x.ai/legal/privacy-policy",
+      "Informativa Privacy SpaceX Superintelligence: https://x.ai/legal/privacy-policy",
       "Informativa Privacy Vercel: https://vercel.com/legal/privacy-policy"
     ],
     "lastUpdated": "Ultimo aggiornamento:",
