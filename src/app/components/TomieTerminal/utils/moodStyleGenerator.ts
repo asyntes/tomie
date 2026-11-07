@@ -23,7 +23,7 @@ export const generateMoodStyles = (currentMood: Mood): string => {
         }
         .terminal-scrollbar::-webkit-scrollbar-track {
             background: ${currentColors.bg};
-            border-left: 0.0625rem solid ${currentColors.border};
+            border-left: 1px solid ${currentColors.border};
         }
         .terminal-scrollbar::-webkit-scrollbar-thumb {
             background: ${currentColors.secondary};
@@ -172,7 +172,7 @@ export const generateMoodStyles = (currentMood: Mood): string => {
                 repeating-linear-gradient(
                     0deg,
                     transparent,
-                    transparent 0.0625rem,
+                    transparent 1px,
                     rgba(${moodRGB}, 0.05) 0.125rem,
                     transparent 0.1875rem
                 );
