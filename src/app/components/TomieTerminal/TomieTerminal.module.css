@@ -13,6 +13,9 @@
   font-family: monospace;
   font-size: 1rem;
   transition: all 1s;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .header {
@@ -22,4 +25,5 @@
   padding: 0.5rem;
   border-bottom: 1px solid;
   transition: all 1s;
+  flex-shrink: 0;
 }
