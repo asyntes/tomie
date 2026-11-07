@@ -30,11 +30,13 @@ export default function TomieTerminal() {
     const inputRef = useRef<HTMLInputElement>(null);
     const transitionFxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [cursorPosition, setCursorPosition] = useState(0);
+    const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
+    const [visualViewportOffsetTop, setVisualViewportOffsetTop] = useState(0);
 
     const MOOD_TRANSITION_FX_MS = 550;
 
     const { isInitialized, isSafari, isTouchDevice, messages, setMessages } = useTerminalSetup(inputRef);
-    const { messagesEndRef } = useMessageHandling(messages);
+    const { messagesEndRef } = useMessageHandling(messages, { isTouchDevice });
     const { t, formatPrivacyPolicy } = useI18n();
 
     const updateCursorPosition = useCallback(() => {
@@ -85,6 +87,41 @@ export default function TomieTerminal() {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, [inputFocused, isTouchDevice, updateCursorPosition]);
+
+    useEffect(() => {
+        if (!isTouchDevice || typeof window === 'undefined') {
+            setVisualViewportHeight(null);
+            setVisualViewportOffsetTop(0);
+            return;
+        }
+
+        const visualViewport = window.visualViewport;
+        if (!visualViewport) {
+            setVisualViewportHeight(window.innerHeight);
+            setVisualViewportOffsetTop(0);
+            return;
+        }
+
+        const syncVisualViewport = () => {
+            setVisualViewportHeight(visualViewport.height);
+            setVisualViewportOffsetTop(visualViewport.offsetTop);
+        };
+
+        syncVisualViewport();
+        visualViewport.addEventListener('resize', syncVisualViewport);
+        visualViewport.addEventListener('scroll', syncVisualViewport);
+        window.addEventListener('resize', syncVisualViewport);
+
+        return () => {
+            visualViewport.removeEventListener('resize', syncVisualViewport);
+            visualViewport.removeEventListener('scroll', syncVisualViewport);
+            window.removeEventListener('resize', syncVisualViewport);
+        };
+    }, [isTouchDevice]);
+
+    const handleSendButtonPointerDown = useCallback((e: React.SyntheticEvent) => {
+        e.preventDefault();
+    }, []);
 
     const handleTerminalClick = useCallback((e: React.MouseEvent) => {
         if (isTouchDevice) return;
@@ -211,11 +248,25 @@ export default function TomieTerminal() {
             style={{
                 backgroundColor: currentColors.bg,
                 color: currentColors.primary,
-                height: isSafari && isTouchDevice ? '100vh' : '-webkit-fill-available',
-                minHeight: isSafari && isTouchDevice ? '100vh' : '100vh',
+                height: isTouchDevice && visualViewportHeight != null
+                    ? `${visualViewportHeight}px`
+                    : isSafari && isTouchDevice
+                        ? '100vh'
+                        : '-webkit-fill-available',
+                minHeight: isTouchDevice && visualViewportHeight != null
+                    ? undefined
+                    : '100vh',
+                maxHeight: isTouchDevice && visualViewportHeight != null
+                    ? `${visualViewportHeight}px`
+                    : undefined,
                 position: 'relative',
+                transform: isTouchDevice && visualViewportOffsetTop > 0
+                    ? `translateY(${visualViewportOffsetTop}px)`
+                    : undefined,
                 paddingTop: isSafari && isTouchDevice ? 'env(safe-area-inset-top)' : '0',
-                paddingBottom: isSafari && isTouchDevice ? 'env(safe-area-inset-bottom)' : '0'
+                paddingBottom: isSafari && isTouchDevice && !(inputFocused && visualViewportHeight != null)
+                    ? 'env(safe-area-inset-bottom)'
+                    : '0'
             }}
             onClick={handleTerminalClick}
         >
@@ -273,11 +324,7 @@ export default function TomieTerminal() {
                 </div>
             </div>
 
-            <div className="flex-1 relative" style={{
-                height: isSafari && isTouchDevice
-                    ? 'calc(100vh - 7.5rem - env(safe-area-inset-top) - env(safe-area-inset-bottom))'
-                    : 'calc(100vh - 7.5rem)'
-            }}>
+            <div className="flex-1 relative min-h-0">
                 <div
                     className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 eye-container"
                 >
@@ -296,7 +343,7 @@ export default function TomieTerminal() {
                     />
                 </div>
 
-                <div className="overflow-y-auto p-4 terminal-scrollbar relative z-10 h-full">
+                <div className="overflow-y-auto p-4 terminal-scrollbar relative z-10 h-full min-h-0">
                     {messages.map((message, index) => (
                         <div
                             key={message.id}
@@ -411,7 +458,7 @@ export default function TomieTerminal() {
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-4">
+            <form onSubmit={handleSubmit} className="p-4 shrink-0">
                 <div className="flex items-center gap-2" onClick={() => !isTouchDevice && inputRef.current?.focus()}>
                     <span style={{ color: currentColors.secondary }}>{'>'}</span>
                     <div className="flex-1 relative">
@@ -458,6 +505,8 @@ export default function TomieTerminal() {
                     <button
                         type="submit"
                         disabled={isTyping || isProcessing || !input.trim()}
+                        onMouseDown={handleSendButtonPointerDown}
+                        onPointerDown={handleSendButtonPointerDown}
                         className="px-3 py-1 border transition-all duration-200 hover:bg-opacity-10 disabled:opacity-50"
                         style={{
                             borderColor: currentColors.border,
