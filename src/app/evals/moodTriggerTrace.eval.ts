@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createInitialMoodState } from '../core/moodStateMachine';
 import { loadEnvLocal } from './evalJudge';
+import { hasSpacexsiApiKey } from '../services/ai/spacexsiEnv';
 
 loadEnvLocal();
 
@@ -13,7 +14,7 @@ import {
 } from './evalHelpers';
 
 const RUN_LLM = process.env.RUN_LLM_EVALS === '1';
-const HAS_KEY = Boolean(process.env.XAI_API_KEY?.trim());
+const HAS_KEY = hasSpacexsiApiKey();
 
 describe('mood trigger trace — simulated', () => {
     it('angry: 2 model angry tags', () => {

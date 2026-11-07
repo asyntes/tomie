@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import OpenAI from 'openai';
+import { getSpacexsiApiKey, getSpacexsiModel } from '../services/ai/spacexsiEnv';
 
 export function loadEnvLocal(): void {
     try {
@@ -20,11 +21,11 @@ export async function judgeWithLlm(
     rubric: string,
     payload: string
 ): Promise<{ pass: boolean; reason: string }> {
-    const apiKey = process.env.XAI_API_KEY;
-    if (!apiKey) throw new Error('XAI_API_KEY required');
+    const apiKey = getSpacexsiApiKey();
+    if (!apiKey) throw new Error('SPACEXSI_API_KEY required');
 
     const client = new OpenAI({ apiKey, baseURL: 'https://api.x.ai/v1' });
-    const model = process.env.XAI_MODEL?.trim() || 'grok-4.20-0309-non-reasoning';
+    const model = getSpacexsiModel();
 
     const completion = await client.chat.completions.create({
         model,
