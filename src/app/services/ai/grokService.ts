@@ -4,6 +4,7 @@ import { AIRequest, AIResponse, AIMessage, AIServiceConfig } from './types';
 import { MoodDetector } from './moodDetector';
 import { PromptGenerator } from './promptGenerator';
 import { USER_MOOD_CLASSIFIER_PROMPT, parseClassifierMood } from './moodClassifier';
+import { getSpacexsiApiKey, getSpacexsiModel } from './spacexsiEnv';
 
 export class GrokService {
   private openai: OpenAI;
@@ -18,13 +19,12 @@ export class GrokService {
   }
 
   static createFromEnv(): GrokService {
-    const apiKey = process.env.XAI_API_KEY;
+    const apiKey = getSpacexsiApiKey();
     if (!apiKey) {
-      throw new Error('XAI_API_KEY environment variable is not set');
+      throw new Error('SPACEXSI_API_KEY environment variable is not set');
     }
 
-    const model =
-      process.env.XAI_MODEL?.trim() || 'grok-4.20-0309-non-reasoning';
+    const model = getSpacexsiModel();
 
     return new GrokService({
       apiKey,
@@ -158,7 +158,7 @@ export class GrokService {
       }
 
       if (apiError.status === 404 && detail) {
-        return `Model unavailable: ${detail}. Set XAI_MODEL in .env.local to a model enabled for your key (see console.x.ai).`;
+        return `Model unavailable: ${detail}. Set SPACEXSI_MODEL in .env.local to a model enabled for your key (see console.x.ai).`;
       }
 
       if (detail) {
@@ -168,7 +168,11 @@ export class GrokService {
     }
 
     if (error instanceof Error && error.message) {
-      if (error.message.includes('API key not configured') || error.message.includes('XAI_API_KEY')) {
+      if (
+        error.message.includes('API key not configured') ||
+        error.message.includes('SPACEXSI_API_KEY') ||
+        error.message.includes('XAI_API_KEY')
+      ) {
         return 'API key not configured';
       }
       // Generic for other errors

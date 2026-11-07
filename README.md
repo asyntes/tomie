@@ -1,6 +1,6 @@
 # Tomie
 
-Interactive AI terminal interface built with Next.js and React. Tomie is a character powered by SpaceX Superintelligence Grok: she replies in a retro terminal UI with distinct moods, each with its own personality, colors, and eye expressions.
+Interactive AI terminal interface built with Next.js and React. Tomie is a character powered by SpaceXSI Grok: she replies in a retro terminal UI with distinct moods, each with its own personality, colors, and eye expressions.
 
 ## Features
 
@@ -83,16 +83,18 @@ After `/clear`, send **two messages in a row** with the same emotional tone. The
 Create `.env.local`:
 
 ```bash
-XAI_API_KEY=your_xai_api_key_here
-XAI_MODEL=grok-4.20-0309-non-reasoning
+SPACEXSI_API_KEY=your_spacexsi_api_key_here
+SPACEXSI_MODEL=grok-4.20-0309-non-reasoning
 ```
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `XAI_API_KEY` | Yes | SpaceX Superintelligence API key from [console.x.ai](https://console.x.ai) |
-| `XAI_MODEL` | No | Chat model id (default: `grok-4.20-0309-non-reasoning`) |
+| `SPACEXSI_API_KEY` | Yes | SpaceXSI API key from [console.x.ai](https://console.x.ai) |
+| `SPACEXSI_MODEL` | No | Chat model id (default: `grok-4.20-0309-non-reasoning`) |
 
-If the API returns a model error, set `XAI_MODEL` to a model enabled for your team in the SpaceX Superintelligence console.
+Legacy names `XAI_API_KEY` and `XAI_MODEL` are still accepted temporarily if the new variables are unset.
+
+If the API returns a model error, set `SPACEXSI_MODEL` to a model enabled for your team in the SpaceXSI console.
 
 ## Getting started
 
@@ -137,7 +139,7 @@ Integration-style checks with Grok as judge (costs API tokens):
 RUN_LLM_EVALS=1 npm run test:eval
 ```
 
-Requires `XAI_API_KEY`. Evals live in `src/app/evals/*.eval.ts`.
+Requires `SPACEXSI_API_KEY`. Evals live in `src/app/evals/*.eval.ts`.
 
 ## Architecture
 
@@ -163,7 +165,7 @@ TomieTerminal
 | [`src/app/core/responseHandler.ts`](src/app/core/responseHandler.ts) | One fetch per message, intro on transition |
 | [`src/app/core/normalizeMoodState.ts`](src/app/core/normalizeMoodState.ts) | Safe state shape after hot reload |
 | [`src/app/core/stateManager.ts`](src/app/core/stateManager.ts) | Initial state + thin wrapper over `commitTurn` |
-| [`src/app/services/ai/grokService.ts`](src/app/services/ai/grokService.ts) | SpaceX Superintelligence client, model from env |
+| [`src/app/services/ai/grokService.ts`](src/app/services/ai/grokService.ts) | SpaceXSI client, model from env |
 | [`src/app/services/ai/promptGenerator.ts`](src/app/services/ai/promptGenerator.ts) | System prompt: `responseMood`, approaching, tag rules |
 | [`src/app/services/ai/moodDetector.ts`](src/app/services/ai/moodDetector.ts) | Parse `[MOOD:…]` from character reply |
 | [`src/app/services/ai/moodClassifier.ts`](src/app/services/ai/moodClassifier.ts) | Fallback LLM classifier when reply tag is neutral |
@@ -192,7 +194,7 @@ TomieTerminal
 - React 19
 - TypeScript
 - Tailwind CSS 4
-- OpenAI SDK → SpaceX Superintelligence endpoint (`https://api.x.ai/v1`)
+- OpenAI SDK → SpaceXSI endpoint (`https://api.x.ai/v1`)
 - Vitest
 - Custom i18n (`src/app/i18n/`)
 

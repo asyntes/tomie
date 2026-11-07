@@ -3,18 +3,23 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import OpenAI from 'openai';
 import { createInitialMoodState, commitTurn } from '../core/moodStateMachine';
+import {
+    getSpacexsiApiKey,
+    getSpacexsiModel,
+    hasSpacexsiApiKey,
+} from '../services/ai/spacexsiEnv';
 
 const RUN_LLM_EVALS = process.env.RUN_LLM_EVALS === '1';
-const hasApiKey = Boolean(process.env.XAI_API_KEY?.trim());
+const hasApiKey = hasSpacexsiApiKey();
 
 async function judgeWithLlm(rubric: string, output: string): Promise<{ pass: boolean; reason: string }> {
-    const apiKey = process.env.XAI_API_KEY;
+    const apiKey = getSpacexsiApiKey();
     if (!apiKey) {
-        throw new Error('XAI_API_KEY required for LLM judge evals');
+        throw new Error('SPACEXSI_API_KEY required for LLM judge evals');
     }
 
     const client = new OpenAI({ apiKey, baseURL: 'https://api.x.ai/v1' });
-    const model = process.env.XAI_MODEL?.trim() || 'grok-4.20-0309-non-reasoning';
+    const model = getSpacexsiModel();
 
     const completion = await client.chat.completions.create({
         model,

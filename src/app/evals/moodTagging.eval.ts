@@ -3,11 +3,12 @@ import { Mood } from '../types/mood';
 import { createInitialMoodState, commitTurn } from '../core/moodStateMachine';
 import { loadEnvLocal } from './evalJudge';
 import { runTomieTurn } from './evalHelpers';
+import { hasSpacexsiApiKey } from '../services/ai/spacexsiEnv';
 
 loadEnvLocal();
 
 const RUN = process.env.RUN_LLM_EVALS === '1';
-const HAS_KEY = Boolean(process.env.XAI_API_KEY?.trim());
+const HAS_KEY = hasSpacexsiApiKey();
 
 interface TagCase {
     label: string;

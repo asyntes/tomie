@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { createInitialMoodState } from '../core/moodStateMachine';
 import { runTomieTurn } from './evalHelpers';
 import { judgeWithLlm, loadEnvLocal } from './evalJudge';
+import { hasSpacexsiApiKey } from '../services/ai/spacexsiEnv';
 
 loadEnvLocal();
 
 const RUN_LLM_EVALS = process.env.RUN_LLM_EVALS === '1';
-const HAS_KEY = Boolean(process.env.XAI_API_KEY?.trim());
+const HAS_KEY = hasSpacexsiApiKey();
 
 describe.skipIf(!RUN_LLM_EVALS || !HAS_KEY)('romantic pacing LLM eval', () => {
     it('single mild compliment stays neutral in state and tone', async () => {
