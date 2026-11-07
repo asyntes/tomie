@@ -33,7 +33,7 @@ export const typeMessage = async (
 
     if (!isTouchDevice) {
         setTimeout(() => {
-            inputRef.current?.focus();
+            inputRef.current?.focus({ preventScroll: true });
         }, 100);
     }
 };

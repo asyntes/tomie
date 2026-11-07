@@ -3,11 +3,8 @@ import { Mood } from '../../../types/mood';
 import { useI18n } from '../../../i18n/useI18n';
 import { Message } from '../../../types/message';
 
-export const useTerminalSetup = (
-  inputRef: React.RefObject<HTMLInputElement | null>
-) => {
+export const useTerminalSetup = () => {
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isSafari, setIsSafari] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const { t } = useI18n();
@@ -56,13 +53,11 @@ export const useTerminalSetup = (
     setMessages(initialMessages);
     setIsInitialized(true);
 
-    // Browser detection (solo client)
-    if (typeof navigator !== 'undefined') {
-      const userAgent = navigator.userAgent;
-      const isSafariBrowser = /^((?!chrome|android).)*safari/i.test(userAgent);
-      const touchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (typeof window !== 'undefined') {
+      const touchDevice =
+        'ontouchstart' in window ||
+        (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
 
-      setIsSafari(isSafariBrowser);
       setIsTouchDevice(touchDevice);
     }
 
@@ -71,7 +66,7 @@ export const useTerminalSetup = (
       if (viewport) {
         viewport.setAttribute(
           'content',
-          'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no'
+          'width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no, interactive-widget=resizes-content'
         );
       }
       setTimeout(() => {
@@ -94,7 +89,6 @@ export const useTerminalSetup = (
 
   return {
     isInitialized,
-    isSafari,
     isTouchDevice,
     messages,
     setMessages
