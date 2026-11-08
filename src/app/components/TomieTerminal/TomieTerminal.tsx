@@ -19,6 +19,9 @@ import { useI18n } from '../../i18n/useI18n';
 import styles from './TomieTerminal.module.css';
 
 const VIEWPORT_RESYNC_DELAYS_MS = [50, 150, 300, 600] as const;
+const KEYBOARD_INSET_OPEN_PX = 120;
+const COARSE_POINTER_QUERY = '(pointer: coarse)';
+const KEYBOARD_LAYOUT_SHRINK_RATIO = 0.75;
 
 export default function TomieTerminal() {
     const [input, setInput] = useState('');
@@ -98,13 +101,30 @@ export default function TomieTerminal() {
             return;
         }
 
+        const root = document.documentElement;
+        const surfaceColor = moodColors[moodState.currentMood].bg;
+        root.setAttribute('data-tomie-terminal-active', 'true');
+        root.style.setProperty('--tomie-terminal-surface', surfaceColor);
+
+        return () => {
+            root.removeAttribute('data-tomie-terminal-active');
+            root.style.removeProperty('--tomie-terminal-surface');
+        };
+    }, [isInitialized, isTouchDevice, moodState.currentMood]);
+
+    useEffect(() => {
+        if (!isInitialized || !isTouchDevice || typeof window === 'undefined') {
+            return;
+        }
+
+        const root = document.documentElement;
         const terminal = terminalRef.current;
         if (!terminal) {
             return;
         }
 
         const lockedScrollY = window.scrollY;
-        const previousHtmlOverflow = document.documentElement.style.overflow;
+        const previousHtmlOverflow = root.style.overflow;
         const previousBodyOverflow = document.body.style.overflow;
         const previousBodyPosition = document.body.style.position;
         const previousBodyTop = document.body.style.top;
@@ -112,7 +132,7 @@ export default function TomieTerminal() {
         const previousBodyRight = document.body.style.right;
         const previousBodyWidth = document.body.style.width;
 
-        document.documentElement.style.overflow = 'hidden';
+        root.style.overflow = 'hidden';
         document.body.style.overflow = 'hidden';
         document.body.style.position = 'fixed';
         document.body.style.top = `-${lockedScrollY}px`;
@@ -124,6 +144,13 @@ export default function TomieTerminal() {
 
         let frameId = 0;
         const pendingTimeouts: number[] = [];
+        let baselineViewportHeight = 0;
+
+        const safeAreaProbe = document.createElement('div');
+        safeAreaProbe.setAttribute('aria-hidden', 'true');
+        safeAreaProbe.style.cssText =
+            'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;padding-bottom:env(safe-area-inset-bottom);';
+        document.body.appendChild(safeAreaProbe);
 
         const clearPendingTimeouts = () => {
             while (pendingTimeouts.length > 0) {
@@ -134,8 +161,54 @@ export default function TomieTerminal() {
             }
         };
 
+        const clearKeyboardFlags = () => {
+            root.removeAttribute('data-tomie-keyboard-open');
+            root.removeAttribute('data-tomie-keyboard-layout');
+        };
+
         const pinMessagesToBottom = () => {
             scrollToBottom('auto');
+        };
+
+        const readViewportSampleHeight = () => {
+            const visualViewportHeight = window.visualViewport?.height ?? 0;
+            return Math.max(window.innerHeight, visualViewportHeight);
+        };
+
+        const isChatTextFieldFocused = () => document.activeElement === inputRef.current;
+
+        const updateBaselineFromViewport = () => {
+            if (isChatTextFieldFocused()) {
+                return;
+            }
+            baselineViewportHeight = Math.max(baselineViewportHeight, readViewportSampleHeight());
+        };
+
+        const readSafeAreaInsetBottomPx = () =>
+            Number.parseFloat(getComputedStyle(safeAreaProbe).paddingBottom) || 0;
+
+        const syncKeyboardFlags = (visualViewport: VisualViewport) => {
+            const layoutHeight = document.documentElement.clientHeight || window.innerHeight;
+            const pinchZoomed = visualViewport.scale > 1.01;
+            const keyboardInset = pinchZoomed
+                ? 0
+                : Math.max(0, layoutHeight - visualViewport.height - visualViewport.offsetTop);
+            const insetKeyboardOpen = !pinchZoomed && keyboardInset > KEYBOARD_INSET_OPEN_PX;
+            const coarsePointer = window.matchMedia(COARSE_POINTER_QUERY).matches;
+            const layoutShrinkKeyboardOpen =
+                !pinchZoomed &&
+                isChatTextFieldFocused() &&
+                coarsePointer &&
+                baselineViewportHeight > 0 &&
+                visualViewport.height < baselineViewportHeight * KEYBOARD_LAYOUT_SHRINK_RATIO;
+            const keyboardOpen = insetKeyboardOpen || layoutShrinkKeyboardOpen;
+            const layoutKeyboardFallback =
+                layoutShrinkKeyboardOpen &&
+                !insetKeyboardOpen &&
+                readSafeAreaInsetBottomPx() === 0;
+
+            root.toggleAttribute('data-tomie-keyboard-open', keyboardOpen);
+            root.toggleAttribute('data-tomie-keyboard-layout', layoutKeyboardFallback);
         };
 
         const applyVisualViewport = () => {
@@ -144,11 +217,15 @@ export default function TomieTerminal() {
                 terminal.style.top = '0px';
                 terminal.style.height = '100dvh';
                 terminal.style.maxHeight = '100dvh';
+                clearKeyboardFlags();
                 window.requestAnimationFrame(() => {
                     window.requestAnimationFrame(pinMessagesToBottom);
                 });
                 return;
             }
+
+            updateBaselineFromViewport();
+            syncKeyboardFlags(visualViewport);
 
             if (visualViewport.scale > 1.01) {
                 const layoutHeight = document.documentElement.clientHeight || window.innerHeight;
@@ -202,12 +279,18 @@ export default function TomieTerminal() {
             window.scrollTo(0, 0);
         };
 
+        const handleOrientationChange = () => {
+            baselineViewportHeight = 0;
+            resyncWithDelays();
+        };
+
+        baselineViewportHeight = readViewportSampleHeight();
         scheduleVisualViewportSync();
 
         window.visualViewport?.addEventListener('resize', scheduleVisualViewportSync);
         window.visualViewport?.addEventListener('scroll', scheduleVisualViewportSync);
         window.addEventListener('resize', scheduleVisualViewportSync);
-        window.addEventListener('orientationchange', resyncWithDelays);
+        window.addEventListener('orientationchange', handleOrientationChange);
         document.addEventListener('focusin', handleFocusIn);
         document.addEventListener('focusout', handleFocusOut);
 
@@ -219,7 +302,7 @@ export default function TomieTerminal() {
             window.visualViewport?.removeEventListener('resize', scheduleVisualViewportSync);
             window.visualViewport?.removeEventListener('scroll', scheduleVisualViewportSync);
             window.removeEventListener('resize', scheduleVisualViewportSync);
-            window.removeEventListener('orientationchange', resyncWithDelays);
+            window.removeEventListener('orientationchange', handleOrientationChange);
             document.removeEventListener('focusin', handleFocusIn);
             document.removeEventListener('focusout', handleFocusOut);
 
@@ -227,8 +310,10 @@ export default function TomieTerminal() {
             terminal.style.removeProperty('top');
             terminal.style.removeProperty('height');
             terminal.style.removeProperty('max-height');
+            clearKeyboardFlags();
+            safeAreaProbe.remove();
 
-            document.documentElement.style.overflow = previousHtmlOverflow;
+            root.style.overflow = previousHtmlOverflow;
             document.body.style.overflow = previousBodyOverflow;
             document.body.style.position = previousBodyPosition;
             document.body.style.top = previousBodyTop;
