@@ -1,8 +1,9 @@
-import { useRef, useEffect, useCallback } from 'react';
+import { useRef, useEffect, useCallback, type RefObject } from 'react';
 import { Message } from '../../../types/message';
 
 type MessageHandlingOptions = {
     isTouchDevice?: boolean;
+    messagesListRef?: RefObject<HTMLDivElement | null>;
 };
 
 export const useMessageHandling = (
@@ -10,34 +11,28 @@ export const useMessageHandling = (
     options: MessageHandlingOptions = {}
 ) => {
     const messagesEndRef = useRef<HTMLDivElement>(null);
-    const { isTouchDevice = false } = options;
+    const { isTouchDevice = false, messagesListRef } = options;
 
-    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    const scrollToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+        const messagesList = messagesListRef?.current;
+        if (messagesList) {
+            if (behavior === 'smooth') {
+                messagesList.scrollTo({
+                    top: messagesList.scrollHeight,
+                    behavior: 'smooth',
+                });
+            } else {
+                messagesList.scrollTop = messagesList.scrollHeight;
+            }
+            return;
+        }
+
         messagesEndRef.current?.scrollIntoView({ behavior, block: 'end' });
-    }, []);
+    }, [messagesListRef]);
 
     useEffect(() => {
-        scrollToBottom('smooth');
-    }, [messages, scrollToBottom]);
-
-    useEffect(() => {
-        if (!isTouchDevice || typeof window === 'undefined') return;
-
-        const visualViewport = window.visualViewport;
-        if (!visualViewport) return;
-
-        const handleViewportChange = () => {
-            scrollToBottom('auto');
-        };
-
-        visualViewport.addEventListener('resize', handleViewportChange);
-        visualViewport.addEventListener('scroll', handleViewportChange);
-
-        return () => {
-            visualViewport.removeEventListener('resize', handleViewportChange);
-            visualViewport.removeEventListener('scroll', handleViewportChange);
-        };
-    }, [isTouchDevice, scrollToBottom]);
+        scrollToBottom(isTouchDevice ? 'auto' : 'smooth');
+    }, [messages, isTouchDevice, scrollToBottom]);
 
     return { messagesEndRef, scrollToBottom };
 };

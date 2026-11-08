@@ -2,8 +2,8 @@ import TomieTerminal from "./components/TomieTerminal";
 
 export default function Home() {
   return (
-    <div className="w-full h-screen">
+    <main className="pageShell">
       <TomieTerminal />
-    </div>
+    </main>
   );
 }
