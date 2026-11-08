@@ -70,6 +70,18 @@
   flex-shrink: 0;
 }
 
+/*
+  Declared Brave iOS (and similar) fallback: browsers that shrink the layout
+  viewport with the keyboard leave innerHeight − visualViewport.height ≈ 0 and
+  expose no API for the ~1.5rem address bar above the keyboard. When JS sets
+  data-tomie-keyboard-layout (layout-shrink path only; never Safari inset),
+  add 1.75rem bottom padding so the composer clears that overlaid chrome.
+  Geometry stays stable between pointerdown and click on send.
+*/
+:global(html[data-tomie-keyboard-layout]) .composer {
+  padding-bottom: calc(1rem + 1.75rem);
+}
+
 .composerRow {
   display: flex;
   align-items: center;
