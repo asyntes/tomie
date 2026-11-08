@@ -18,6 +18,8 @@ import { MoodState } from '../../types/mood';
 import { useI18n } from '../../i18n/useI18n';
 import styles from './TomieTerminal.module.css';
 
+const VIEWPORT_RESYNC_DELAYS_MS = [50, 150, 300, 600] as const;
+
 export default function TomieTerminal() {
     const [input, setInput] = useState('');
     const [moodState, setMoodState] = useState<MoodState>(() => createInitialMoodState());
@@ -28,15 +30,18 @@ export default function TomieTerminal() {
     const [showInterference, setShowInterference] = useState(false);
     const [showLoadingDots, setShowLoadingDots] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const terminalRef = useRef<HTMLDivElement>(null);
+    const messagesListRef = useRef<HTMLDivElement>(null);
     const transitionFxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [cursorPosition, setCursorPosition] = useState(0);
-    const [visualViewportHeight, setVisualViewportHeight] = useState<number | null>(null);
-    const [visualViewportOffsetTop, setVisualViewportOffsetTop] = useState(0);
 
     const MOOD_TRANSITION_FX_MS = 550;
 
-    const { isInitialized, isSafari, isTouchDevice, messages, setMessages } = useTerminalSetup(inputRef);
-    const { messagesEndRef } = useMessageHandling(messages, { isTouchDevice });
+    const { isInitialized, isTouchDevice, messages, setMessages } = useTerminalSetup();
+    const { messagesEndRef, scrollToBottom } = useMessageHandling(messages, {
+        isTouchDevice,
+        messagesListRef,
+    });
     const { t, formatPrivacyPolicy } = useI18n();
 
     const updateCursorPosition = useCallback(() => {
@@ -89,49 +94,188 @@ export default function TomieTerminal() {
     }, [inputFocused, isTouchDevice, updateCursorPosition]);
 
     useEffect(() => {
-        if (!isTouchDevice || typeof window === 'undefined') {
-            setVisualViewportHeight(null);
-            setVisualViewportOffsetTop(0);
+        if (!isInitialized || !isTouchDevice || typeof window === 'undefined') {
             return;
         }
 
-        const visualViewport = window.visualViewport;
-        if (!visualViewport) {
-            setVisualViewportHeight(window.innerHeight);
-            setVisualViewportOffsetTop(0);
+        const terminal = terminalRef.current;
+        if (!terminal) {
             return;
         }
 
-        const syncVisualViewport = () => {
-            setVisualViewportHeight(visualViewport.height);
-            setVisualViewportOffsetTop(visualViewport.offsetTop);
+        const lockedScrollY = window.scrollY;
+        const previousHtmlOverflow = document.documentElement.style.overflow;
+        const previousBodyOverflow = document.body.style.overflow;
+        const previousBodyPosition = document.body.style.position;
+        const previousBodyTop = document.body.style.top;
+        const previousBodyLeft = document.body.style.left;
+        const previousBodyRight = document.body.style.right;
+        const previousBodyWidth = document.body.style.width;
+
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
+        document.body.style.position = 'fixed';
+        document.body.style.top = `-${lockedScrollY}px`;
+        document.body.style.left = '0';
+        document.body.style.right = '0';
+        document.body.style.width = '100%';
+
+        terminal.classList.add(styles.terminalViewportLocked);
+
+        let frameId = 0;
+        const pendingTimeouts: number[] = [];
+
+        const clearPendingTimeouts = () => {
+            while (pendingTimeouts.length > 0) {
+                const timeoutId = pendingTimeouts.pop();
+                if (timeoutId != null) {
+                    window.clearTimeout(timeoutId);
+                }
+            }
         };
 
-        syncVisualViewport();
-        visualViewport.addEventListener('resize', syncVisualViewport);
-        visualViewport.addEventListener('scroll', syncVisualViewport);
-        window.addEventListener('resize', syncVisualViewport);
+        const pinMessagesToBottom = () => {
+            scrollToBottom('auto');
+        };
+
+        const applyVisualViewport = () => {
+            const visualViewport = window.visualViewport;
+            if (!visualViewport) {
+                terminal.style.top = '0px';
+                terminal.style.height = '100dvh';
+                terminal.style.maxHeight = '100dvh';
+                window.requestAnimationFrame(() => {
+                    window.requestAnimationFrame(pinMessagesToBottom);
+                });
+                return;
+            }
+
+            if (visualViewport.scale > 1.01) {
+                const layoutHeight = document.documentElement.clientHeight || window.innerHeight;
+                terminal.style.top = '0px';
+                terminal.style.height = `${layoutHeight}px`;
+                terminal.style.maxHeight = `${layoutHeight}px`;
+            } else {
+                const visibleTop = visualViewport.offsetTop;
+                const visibleHeight = visualViewport.height;
+                terminal.style.top = `${visibleTop}px`;
+                terminal.style.height = `${visibleHeight}px`;
+                terminal.style.maxHeight = `${visibleHeight}px`;
+            }
+
+            window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(pinMessagesToBottom);
+            });
+        };
+
+        const scheduleVisualViewportSync = () => {
+            if (frameId) {
+                window.cancelAnimationFrame(frameId);
+            }
+            frameId = window.requestAnimationFrame(() => {
+                frameId = 0;
+                applyVisualViewport();
+            });
+        };
+
+        const resyncWithDelays = () => {
+            scheduleVisualViewportSync();
+            clearPendingTimeouts();
+            for (const delayMs of VIEWPORT_RESYNC_DELAYS_MS) {
+                pendingTimeouts.push(window.setTimeout(scheduleVisualViewportSync, delayMs));
+            }
+        };
+
+        const handleFocusIn = (event: FocusEvent) => {
+            const target = event.target;
+            if (!(target instanceof HTMLElement)) {
+                return;
+            }
+            if (target !== inputRef.current && !terminal.contains(target)) {
+                return;
+            }
+            resyncWithDelays();
+        };
+
+        const handleFocusOut = () => {
+            resyncWithDelays();
+            window.scrollTo(0, 0);
+        };
+
+        scheduleVisualViewportSync();
+
+        window.visualViewport?.addEventListener('resize', scheduleVisualViewportSync);
+        window.visualViewport?.addEventListener('scroll', scheduleVisualViewportSync);
+        window.addEventListener('resize', scheduleVisualViewportSync);
+        window.addEventListener('orientationchange', resyncWithDelays);
+        document.addEventListener('focusin', handleFocusIn);
+        document.addEventListener('focusout', handleFocusOut);
 
         return () => {
-            visualViewport.removeEventListener('resize', syncVisualViewport);
-            visualViewport.removeEventListener('scroll', syncVisualViewport);
-            window.removeEventListener('resize', syncVisualViewport);
-        };
-    }, [isTouchDevice]);
+            clearPendingTimeouts();
+            if (frameId) {
+                window.cancelAnimationFrame(frameId);
+            }
+            window.visualViewport?.removeEventListener('resize', scheduleVisualViewportSync);
+            window.visualViewport?.removeEventListener('scroll', scheduleVisualViewportSync);
+            window.removeEventListener('resize', scheduleVisualViewportSync);
+            window.removeEventListener('orientationchange', resyncWithDelays);
+            document.removeEventListener('focusin', handleFocusIn);
+            document.removeEventListener('focusout', handleFocusOut);
 
-    const handleSendButtonPointerDown = useCallback((e: React.SyntheticEvent) => {
-        e.preventDefault();
+            terminal.classList.remove(styles.terminalViewportLocked);
+            terminal.style.removeProperty('top');
+            terminal.style.removeProperty('height');
+            terminal.style.removeProperty('max-height');
+
+            document.documentElement.style.overflow = previousHtmlOverflow;
+            document.body.style.overflow = previousBodyOverflow;
+            document.body.style.position = previousBodyPosition;
+            document.body.style.top = previousBodyTop;
+            document.body.style.left = previousBodyLeft;
+            document.body.style.right = previousBodyRight;
+            document.body.style.width = previousBodyWidth;
+            window.scrollTo(0, lockedScrollY);
+        };
+    }, [isInitialized, isTouchDevice, scrollToBottom]);
+
+    const preserveInputFocusOnSendPointerDown = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+        if (event.button !== 0) {
+            return;
+        }
+        if (event.pointerType === 'mouse') {
+            return;
+        }
+        event.preventDefault();
+    }, []);
+
+    const preserveInputFocusOnSendMouseDown = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+        if (event.button !== 0) {
+            return;
+        }
+        event.preventDefault();
+    }, []);
+
+    const requestFormSubmit = useCallback((form: HTMLFormElement | null) => {
+        if (!form) {
+            return;
+        }
+        if (typeof form.requestSubmit === 'function') {
+            form.requestSubmit();
+            return;
+        }
+        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
     }, []);
 
     const handleTerminalClick = useCallback((e: React.MouseEvent) => {
         if (isTouchDevice) return;
-        
+
         const target = e.target as HTMLElement;
         const isInputArea = target === inputRef.current || inputRef.current?.contains(target);
         const isMessageArea = target.closest('.message-content');
-        
+
         if (isInputArea) {
-            inputRef.current?.focus();
+            inputRef.current?.focus({ preventScroll: true });
         } else if (!isMessageArea) {
             inputRef.current?.blur();
         }
@@ -244,29 +388,11 @@ export default function TomieTerminal() {
 
     return (
         <div
+            ref={terminalRef}
             className={`${styles.terminal} ${isGlitching ? 'glitch-active' : ''}`}
             style={{
                 backgroundColor: currentColors.bg,
                 color: currentColors.primary,
-                height: isTouchDevice && visualViewportHeight != null
-                    ? `${visualViewportHeight}px`
-                    : isSafari && isTouchDevice
-                        ? '100vh'
-                        : '-webkit-fill-available',
-                minHeight: isTouchDevice && visualViewportHeight != null
-                    ? undefined
-                    : '100vh',
-                maxHeight: isTouchDevice && visualViewportHeight != null
-                    ? `${visualViewportHeight}px`
-                    : undefined,
-                position: 'relative',
-                transform: isTouchDevice && visualViewportOffsetTop > 0
-                    ? `translateY(${visualViewportOffsetTop}px)`
-                    : undefined,
-                paddingTop: isSafari && isTouchDevice ? 'env(safe-area-inset-top)' : '0',
-                paddingBottom: isSafari && isTouchDevice && !(inputFocused && visualViewportHeight != null)
-                    ? 'env(safe-area-inset-bottom)'
-                    : '0'
             }}
             onClick={handleTerminalClick}
         >
@@ -280,9 +406,6 @@ export default function TomieTerminal() {
                 style={{
                     borderColor: currentColors.border,
                     backgroundColor: currentColors.bg,
-                    position: 'sticky',
-                    top: isSafari && isTouchDevice ? 'env(safe-area-inset-top)' : '0',
-                    zIndex: 50
                 }}
             >
                 <div className="flex items-center gap-2">
@@ -324,7 +447,7 @@ export default function TomieTerminal() {
                 </div>
             </div>
 
-            <div className="flex-1 relative min-h-0">
+            <div className={styles.messagesColumn}>
                 <div
                     className="absolute inset-0 flex items-center justify-center pointer-events-none z-0 eye-container"
                 >
@@ -343,7 +466,10 @@ export default function TomieTerminal() {
                     />
                 </div>
 
-                <div className="overflow-y-auto p-4 terminal-scrollbar relative z-10 h-full min-h-0">
+                <div
+                    ref={messagesListRef}
+                    className={`${styles.messagesList} terminal-scrollbar`}
+                >
                     {messages.map((message, index) => (
                         <div
                             key={message.id}
@@ -458,14 +584,25 @@ export default function TomieTerminal() {
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-4 shrink-0">
-                <div className="flex items-center gap-2" onClick={() => !isTouchDevice && inputRef.current?.focus()}>
+            <form onSubmit={handleSubmit} className={styles.composer}>
+                <div
+                    className={styles.composerRow}
+                    onClick={() => {
+                        if (!isTouchDevice) {
+                            inputRef.current?.focus({ preventScroll: true });
+                        }
+                    }}
+                >
                     <span style={{ color: currentColors.secondary }}>{'>'}</span>
                     <div className="flex-1 relative">
                         <input
                             ref={inputRef}
                             type="text"
                             value={input}
+                            enterKeyHint="send"
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="sentences"
                             onChange={(e) => {
                                 setInput(e.target.value);
                             }}
@@ -476,10 +613,31 @@ export default function TomieTerminal() {
                             }}
                             onFocus={() => {
                                 setInputFocused(true);
-                                updateCursorPosition();
+                                if (!isTouchDevice) {
+                                    updateCursorPosition();
+                                }
                             }}
                             onBlur={() => {
                                 setInputFocused(false);
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.nativeEvent.isComposing || e.keyCode === 229) {
+                                    return;
+                                }
+                                if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    requestFormSubmit(e.currentTarget.form);
+                                }
+                            }}
+                            onBeforeInput={(e) => {
+                                const inputEvent = e.nativeEvent;
+                                if (
+                                    inputEvent.inputType === 'insertLineBreak' ||
+                                    inputEvent.inputType === 'insertParagraph'
+                                ) {
+                                    e.preventDefault();
+                                    requestFormSubmit(e.currentTarget.form);
+                                }
                             }}
                             disabled={isTyping || isProcessing}
                             className={`w-full bg-transparent border-none outline-none terminal-input ${isTouchDevice ? '' : 'caret-transparent'}`}
@@ -505,9 +663,9 @@ export default function TomieTerminal() {
                     <button
                         type="submit"
                         disabled={isTyping || isProcessing || !input.trim()}
-                        onMouseDown={handleSendButtonPointerDown}
-                        onPointerDown={handleSendButtonPointerDown}
-                        className="px-3 py-1 border transition-all duration-200 hover:bg-opacity-10 disabled:opacity-50"
+                        onPointerDown={preserveInputFocusOnSendPointerDown}
+                        onMouseDown={preserveInputFocusOnSendMouseDown}
+                        className={styles.sendButton}
                         style={{
                             borderColor: currentColors.border,
                             color: currentColors.secondary,
