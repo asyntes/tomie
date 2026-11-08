@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import enTranslations from './en.json';
 import itTranslations from './it.json';
 
@@ -62,16 +62,29 @@ const detectLanguage = (): Language => {
   return 'en';
 };
 
+const applyDocumentLang = (language: Language) => {
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = language;
+  }
+};
+
 export const useI18n = () => {
-  const [language, setLanguage] = useState<Language>('en');
+  const [language, setLanguageState] = useState<Language>('en');
   const [isLocaleReady, setIsLocaleReady] = useState(false);
 
   useEffect(() => {
-    setLanguage(detectLanguage());
+    const detectedLanguage = detectLanguage();
+    setLanguageState(detectedLanguage);
+    applyDocumentLang(detectedLanguage);
     setIsLocaleReady(true);
   }, []);
 
-  const t = (key: string, params?: Record<string, string>): string => {
+  const setLanguage = useCallback((nextLanguage: Language) => {
+    setLanguageState(nextLanguage);
+    applyDocumentLang(nextLanguage);
+  }, []);
+
+  const t = useCallback((key: string, params?: Record<string, string>): string => {
     const keys = key.split('.');
     let value: unknown = translations[language];
 
@@ -95,9 +108,9 @@ export const useI18n = () => {
     }
 
     return value;
-  };
+  }, [language]);
 
-  const formatPrivacyPolicy = (): string => {
+  const formatPrivacyPolicy = useCallback((): string => {
     const privacy = translations[language].privacy;
 
     let policy = `${privacy.title}\n\n`;
@@ -130,7 +143,7 @@ export const useI18n = () => {
     policy += `\n${privacy.lastUpdated} ${new Date().toLocaleDateString()}`;
 
     return policy;
-  };
+  }, [language]);
 
   return {
     language,

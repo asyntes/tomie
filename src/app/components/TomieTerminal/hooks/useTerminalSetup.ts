@@ -1,65 +1,116 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Mood } from '../../../types/mood';
-import { useI18n } from '../../../i18n/useI18n';
+import { Language } from '../../../i18n/useI18n';
 import { Message } from '../../../types/message';
 
-export const useTerminalSetup = () => {
+const WELCOME_MESSAGE_IDS = ['1', '2', '3', '4', '5'] as const;
+
+type TranslateFn = (key: string, params?: Record<string, string>) => string;
+
+type TerminalSetupOptions = {
+  t: TranslateFn;
+  isLocaleReady: boolean;
+  language: Language;
+};
+
+const buildWelcomeMessages = (t: TranslateFn): Message[] => [
+  {
+    id: '1',
+    text: t('welcome.initialized'),
+    isUser: false,
+    timestamp: new Date(),
+    mood: 'neutral' as Mood
+  },
+  {
+    id: '2',
+    text: t('welcome.connection'),
+    isUser: false,
+    timestamp: new Date(),
+    mood: 'neutral' as Mood
+  },
+  {
+    id: '3',
+    text: t('welcome.help'),
+    isUser: false,
+    timestamp: new Date(),
+    mood: 'neutral' as Mood
+  },
+  {
+    id: '4',
+    text: t('welcome.privacy'),
+    isUser: false,
+    timestamp: new Date(),
+    mood: 'neutral' as Mood
+  },
+  {
+    id: '5',
+    text: t('welcome.greeting'),
+    isUser: false,
+    timestamp: new Date(),
+    mood: 'excited' as Mood
+  }
+];
+
+const isUntouchedWelcome = (messages: Message[]): boolean => {
+  if (messages.length === 0) {
+    return true;
+  }
+
+  if (messages.some((message) => message.isUser)) {
+    return false;
+  }
+
+  if (messages.length !== WELCOME_MESSAGE_IDS.length) {
+    return false;
+  }
+
+  return messages.every((message, index) => message.id === WELCOME_MESSAGE_IDS[index]);
+};
+
+export const useTerminalSetup = ({
+  t,
+  isLocaleReady,
+  language,
+}: TerminalSetupOptions) => {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isTouchDevice, setIsTouchDevice] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
-  const { t } = useI18n();
-
-  const initialMessages = useMemo(() => [
-    {
-      id: '1',
-      text: t('welcome.initialized'),
-      isUser: false,
-      timestamp: new Date(),
-      mood: 'neutral' as Mood
-    },
-    {
-      id: '2',
-      text: t('welcome.connection'),
-      isUser: false,
-      timestamp: new Date(),
-      mood: 'neutral' as Mood
-    },
-    {
-      id: '3',
-      text: t('welcome.help'),
-      isUser: false,
-      timestamp: new Date(),
-      mood: 'neutral' as Mood
-    },
-    {
-      id: '4',
-      text: t('welcome.privacy'),
-      isUser: false,
-      timestamp: new Date(),
-      mood: 'neutral' as Mood
-    },
-    {
-      id: '5',
-      text: t('welcome.greeting'),
-      isUser: false,
-      timestamp: new Date(),
-      mood: 'excited' as Mood
-    }
-  ], [t]);
+  const welcomeLanguageRef = useRef<Language | null>(null);
 
   useEffect(() => {
-    if (isInitialized) return;
-
-    setMessages(initialMessages);
-    setIsInitialized(true);
-
-    if (typeof window !== 'undefined') {
-      const touchDevice =
-        'ontouchstart' in window ||
-        (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
-
-      setIsTouchDevice(touchDevice);
+    if (!isLocaleReady) {
+      return;
     }
+
+    const nextWelcomeMessages = buildWelcomeMessages(t);
+
+    if (!isInitialized) {
+      setMessages(nextWelcomeMessages);
+      welcomeLanguageRef.current = language;
+      setIsInitialized(true);
+      return;
+    }
+
+    if (welcomeLanguageRef.current === language) {
+      return;
+    }
+
+    setMessages((previousMessages) => (
+      isUntouchedWelcome(previousMessages) ? nextWelcomeMessages : previousMessages
+    ));
+    welcomeLanguageRef.current = language;
+  }, [isLocaleReady, isInitialized, language, t]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const touchDevice =
+      'ontouchstart' in window ||
+      (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0);
+
+    setIsTouchDevice(touchDevice);
 
     const handleOrientationChange = () => {
       const viewport = document.querySelector('meta[name=viewport]');
@@ -85,10 +136,10 @@ export const useTerminalSetup = () => {
       window.removeEventListener('orientationchange', handleOrientationChange);
       window.removeEventListener('resize', handleOrientationChange);
     };
-  }, [isInitialized, initialMessages]);
+  }, []);
 
   return {
-    isInitialized,
+    isInitialized: isInitialized && isLocaleReady,
     isTouchDevice,
     messages,
     setMessages
