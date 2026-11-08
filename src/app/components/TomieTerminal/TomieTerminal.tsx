@@ -44,12 +44,16 @@ export default function TomieTerminal() {
 
     const MOOD_TRANSITION_FX_MS = 550;
 
-    const { isInitialized, isTouchDevice, messages, setMessages } = useTerminalSetup();
+    const { t, formatPrivacyPolicy, isLocaleReady, language } = useI18n();
+    const { isInitialized, isTouchDevice, messages, setMessages } = useTerminalSetup({
+        t,
+        isLocaleReady,
+        language,
+    });
     const { messagesEndRef, scrollToBottom } = useMessageHandling(messages, {
         isTouchDevice,
         messagesListRef,
     });
-    const { t, formatPrivacyPolicy } = useI18n();
 
     const updateCursorPosition = useCallback(() => {
         if (inputRef.current) {
@@ -532,7 +536,7 @@ export default function TomieTerminal() {
 
     const dynamicStyles = generateMoodStyles(moodState.currentMood);
 
-    if (!isInitialized) {
+    if (!isLocaleReady || !isInitialized) {
         return (
             <div
                 className={styles.container}
@@ -541,7 +545,7 @@ export default function TomieTerminal() {
                     color: currentColors.primary
                 }}
             >
-                <div>{t('terminal.initializing')}</div>
+                {isLocaleReady ? <div>{t('terminal.initializing')}</div> : null}
             </div>
         );
     }
