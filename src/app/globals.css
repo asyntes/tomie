@@ -35,6 +35,21 @@ html, body {
   text-size-adjust: 100%;
 }
 
+html[data-tomie-terminal-active],
+html[data-tomie-terminal-active] body {
+  background-color: var(--tomie-terminal-surface);
+  background-image: none;
+}
+
+html[data-tomie-terminal-active] .pageShell {
+  background-color: var(--tomie-terminal-surface);
+}
+
+html[data-tomie-keyboard-open] .eye-container,
+html[data-tomie-keyboard-open] .interference-overlay {
+  visibility: hidden;
+}
+
 .pageShell {
   width: 100%;
   height: 100%;

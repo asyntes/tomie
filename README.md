@@ -10,6 +10,7 @@ Interactive AI terminal interface built with Next.js and React. Tomie is a chara
 - **Tone vs tag separation** — Speaking style follows `responseMood`; the tag reflects user input tendency
 - **Single API call per message** — One Grok request per user turn (transition system intro when mood changes)
 - **Terminal aesthetic** — Typing animation, custom cursor, mood-themed styling, short glitch/interference burst on mood change (~0.5s, plays once)
+- **Mobile keyboard layout** — On touch devices the terminal locks to `visualViewport` and keeps `html`/`body` (and the page shell) on the same opaque mood surface color so Safari iOS does not paint a mismatched strip under the floating chrome while the keyboard is open
 - **Built-in commands** — `/clear`, `/help`, `/repo`, `/privacy`
 - **i18n** — Italian and English (browser language detection)
 

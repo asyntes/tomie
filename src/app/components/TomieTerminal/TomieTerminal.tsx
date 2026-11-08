@@ -98,6 +98,39 @@ export default function TomieTerminal() {
             return;
         }
 
+        const root = document.documentElement;
+        const surfaceColor = moodColors[moodState.currentMood].bg;
+        root.setAttribute('data-tomie-terminal-active', 'true');
+        root.style.setProperty('--tomie-terminal-surface', surfaceColor);
+
+        return () => {
+            root.removeAttribute('data-tomie-terminal-active');
+            root.style.removeProperty('--tomie-terminal-surface');
+        };
+    }, [isInitialized, isTouchDevice, moodState.currentMood]);
+
+    useEffect(() => {
+        if (!isInitialized || !isTouchDevice || typeof window === 'undefined') {
+            return;
+        }
+
+        const root = document.documentElement;
+        if (inputFocused) {
+            root.setAttribute('data-tomie-keyboard-open', 'true');
+        } else {
+            root.removeAttribute('data-tomie-keyboard-open');
+        }
+
+        return () => {
+            root.removeAttribute('data-tomie-keyboard-open');
+        };
+    }, [isInitialized, isTouchDevice, inputFocused]);
+
+    useEffect(() => {
+        if (!isInitialized || !isTouchDevice || typeof window === 'undefined') {
+            return;
+        }
+
         const terminal = terminalRef.current;
         if (!terminal) {
             return;
