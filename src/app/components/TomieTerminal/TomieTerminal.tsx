@@ -10,6 +10,10 @@ import { generateMoodStyles } from './utils/moodStyleGenerator';
 import { typeMessage } from './utils/typingEffect';
 import { handleCommand } from './utils/terminalCommands';
 import { processLinksInText } from './utils/messageLinkProcessor';
+import {
+    canElementScrollVerticallyInDirection,
+    resolveVerticalScrollLockTarget,
+} from './utils/touchScrollLock';
 import { useTerminalSetup } from './hooks/useTerminalSetup';
 import { useMessageHandling } from './hooks/useMessageHandling';
 import { LoadingDots } from './components/LoadingDots';
@@ -132,8 +136,13 @@ export default function TomieTerminal() {
         const previousBodyRight = document.body.style.right;
         const previousBodyWidth = document.body.style.width;
 
+        const previousHtmlOverscrollBehavior = root.style.overscrollBehavior;
+        const previousBodyOverscrollBehavior = document.body.style.overscrollBehavior;
+
         root.style.overflow = 'hidden';
+        root.style.overscrollBehavior = 'none';
         document.body.style.overflow = 'hidden';
+        document.body.style.overscrollBehavior = 'none';
         document.body.style.position = 'fixed';
         document.body.style.top = `-${lockedScrollY}px`;
         document.body.style.left = '0';
@@ -145,6 +154,8 @@ export default function TomieTerminal() {
         let frameId = 0;
         const pendingTimeouts: number[] = [];
         let baselineViewportHeight = 0;
+        let touchLockStartY = 0;
+        let touchLockStartTarget: EventTarget | null = null;
 
         const safeAreaProbe = document.createElement('div');
         safeAreaProbe.setAttribute('aria-hidden', 'true');
@@ -284,6 +295,45 @@ export default function TomieTerminal() {
             resyncWithDelays();
         };
 
+        const handleTouchStartForScrollLock = (event: TouchEvent) => {
+            if (event.touches.length === 0) {
+                return;
+            }
+            touchLockStartY = event.touches[0].clientY;
+            touchLockStartTarget = event.target;
+        };
+
+        const handleTouchMoveForScrollLock = (event: TouchEvent) => {
+            if (event.touches.length === 0) {
+                return;
+            }
+
+            const deltaY = event.touches[0].clientY - touchLockStartY;
+            if (deltaY === 0) {
+                return;
+            }
+
+            const scrollTarget = resolveVerticalScrollLockTarget(touchLockStartTarget, [
+                messagesListRef.current,
+                inputRef.current,
+            ]);
+
+            if (
+                scrollTarget &&
+                canElementScrollVerticallyInDirection(scrollTarget, deltaY)
+            ) {
+                return;
+            }
+
+            event.preventDefault();
+        };
+
+        const touchMoveListenerOptions: AddEventListenerOptions = { passive: false };
+        const documentTouchMoveListenerOptions: AddEventListenerOptions = {
+            passive: false,
+            capture: true,
+        };
+
         baselineViewportHeight = readViewportSampleHeight();
         scheduleVisualViewportSync();
 
@@ -293,6 +343,17 @@ export default function TomieTerminal() {
         window.addEventListener('orientationchange', handleOrientationChange);
         document.addEventListener('focusin', handleFocusIn);
         document.addEventListener('focusout', handleFocusOut);
+        terminal.addEventListener('touchstart', handleTouchStartForScrollLock, { passive: true });
+        terminal.addEventListener('touchmove', handleTouchMoveForScrollLock, touchMoveListenerOptions);
+        document.addEventListener('touchstart', handleTouchStartForScrollLock, {
+            passive: true,
+            capture: true,
+        });
+        document.addEventListener(
+            'touchmove',
+            handleTouchMoveForScrollLock,
+            documentTouchMoveListenerOptions,
+        );
 
         return () => {
             clearPendingTimeouts();
@@ -305,6 +366,18 @@ export default function TomieTerminal() {
             window.removeEventListener('orientationchange', handleOrientationChange);
             document.removeEventListener('focusin', handleFocusIn);
             document.removeEventListener('focusout', handleFocusOut);
+            terminal.removeEventListener('touchstart', handleTouchStartForScrollLock);
+            terminal.removeEventListener('touchmove', handleTouchMoveForScrollLock);
+            document.removeEventListener(
+                'touchstart',
+                handleTouchStartForScrollLock,
+                { capture: true },
+            );
+            document.removeEventListener(
+                'touchmove',
+                handleTouchMoveForScrollLock,
+                documentTouchMoveListenerOptions,
+            );
 
             terminal.classList.remove(styles.terminalViewportLocked);
             terminal.style.removeProperty('top');
@@ -314,7 +387,9 @@ export default function TomieTerminal() {
             safeAreaProbe.remove();
 
             root.style.overflow = previousHtmlOverflow;
+            root.style.overscrollBehavior = previousHtmlOverscrollBehavior;
             document.body.style.overflow = previousBodyOverflow;
+            document.body.style.overscrollBehavior = previousBodyOverscrollBehavior;
             document.body.style.position = previousBodyPosition;
             document.body.style.top = previousBodyTop;
             document.body.style.left = previousBodyLeft;

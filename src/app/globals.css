@@ -39,6 +39,7 @@ html[data-tomie-terminal-active],
 html[data-tomie-terminal-active] body {
   background-color: var(--tomie-terminal-surface);
   background-image: none;
+  overscroll-behavior: none;
 }
 
 html[data-tomie-terminal-active] .pageShell {
